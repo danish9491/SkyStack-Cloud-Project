@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import BreadcrumbNav from "@/components/files/BreadcrumbNav";
@@ -7,6 +6,7 @@ import FileActions from "@/components/files/FileActions";
 import StorageStats from "@/components/files/StorageStats";
 import ShareModal from "@/components/files/ShareModal";
 import { useToast } from "@/components/ui/use-toast";
+import { Button } from "@/components/ui/button";
 
 // Mock data for the demo
 const generateMockFiles = (): FileItem[] => {
