@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -16,11 +16,10 @@ import {
   FolderPlus,
   Undo2,
 } from "lucide-react";
-import NewFolderModal from "./NewFolderModal";
 
 type FileActionsProps = {
   onUploadClick: (files: FileList | null) => void;
-  onCreateFolder: (name: string) => void;
+  onCreateFolder: () => void;
   viewMode: "grid" | "list";
   onViewModeChange: (mode: "grid" | "list") => void;
   showRestoreAll?: boolean;
@@ -35,10 +34,8 @@ const FileActions: React.FC<FileActionsProps> = ({
   showRestoreAll = false,
   onRestoreAll,
 }) => {
-  const [isNewFolderModalOpen, setIsNewFolderModalOpen] = useState(false);
-  
   // Create a ref for the file input
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const handleUploadButtonClick = () => {
     if (fileInputRef.current) {
@@ -63,7 +60,7 @@ const FileActions: React.FC<FileActionsProps> = ({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent>
-            <DropdownMenuItem onClick={() => setIsNewFolderModalOpen(true)}>
+            <DropdownMenuItem onClick={onCreateFolder}>
               <FolderPlus className="h-4 w-4 mr-2" /> New Folder
             </DropdownMenuItem>
             {/* Can add more items here, like "New Document" etc. */}
@@ -96,12 +93,6 @@ const FileActions: React.FC<FileActionsProps> = ({
           <List className="h-4 w-4" />
         </Button>
       </div>
-      
-      <NewFolderModal
-        isOpen={isNewFolderModalOpen}
-        onClose={() => setIsNewFolderModalOpen(false)}
-        onCreateFolder={onCreateFolder}
-      />
       
       {/* Hidden file input for file uploads */}
       <input

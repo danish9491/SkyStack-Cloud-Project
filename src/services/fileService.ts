@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { FileItem } from "@/components/files/FileGrid";
 import { Database } from "@/integrations/supabase/types";
@@ -80,15 +81,15 @@ export async function fetchAllItems(folderId: string | null = null, view: 'all' 
 
 export async function createFolder(name: string, parentFolderId: string | null = null) {
   try {
-    const user = supabase.auth.getUser();
-    if (!user) throw new Error("User not authenticated");
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError || !userData.user) throw new Error("User not authenticated");
 
     const { data, error } = await supabase
       .from('folders')
       .insert({
         name,
         parent_folder_id: parentFolderId,
-        user_id: (await user).data.user?.id
+        user_id: userData.user.id
       })
       .select()
       .single();
@@ -206,14 +207,14 @@ export async function deleteItemPermanently(item: FileItem) {
 
 export const shareFile = async (fileId: string, sharedWith: string | null = null, accessLevel: string = 'view', expiresAt: Date | null = null) => {
   try {
-    const { data: user } = await supabase.auth.getUser();
-    if (!user.user) throw new Error("User not authenticated");
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError || !userData.user) throw new Error("User not authenticated");
 
     const { data, error } = await supabase
       .from('shared_files')
       .insert({
         file_id: fileId,
-        shared_by: user.user.id,
+        shared_by: userData.user.id,
         shared_with: sharedWith,
         access_level: accessLevel,
         expires_at: expiresAt ? expiresAt.toISOString() : null
@@ -221,7 +222,8 @@ export const shareFile = async (fileId: string, sharedWith: string | null = null
 
     if (error) throw error;
 
-    return { success: true, shareId: data?.[0]?.id || null };
+    // Safely access data - fix for the TypeScript error
+    return { success: true, shareId: data && data[0] ? data[0].id : null };
   } catch (error) {
     console.error('Error sharing file:', error);
     return { success: false, error };

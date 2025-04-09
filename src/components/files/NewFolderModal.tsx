@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -26,17 +26,25 @@ const NewFolderModal: React.FC<NewFolderModalProps> = ({
   const [folderName, setFolderName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   
+  // Reset folder name when modal opens/closes
+  useEffect(() => {
+    if (isOpen) {
+      setFolderName("");
+      setIsLoading(false);
+    }
+  }, [isOpen]);
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!folderName.trim()) return;
     
     setIsLoading(true);
     try {
-      // In a real app, this would interact with Supabase
-      await new Promise(resolve => setTimeout(resolve, 500));
-      onCreateFolder(folderName);
+      await onCreateFolder(folderName);
       setFolderName("");
-      onClose();
+      // Don't call onClose here - let the parent component control the modal visibility
+    } catch (error) {
+      console.error("Error creating folder:", error);
     } finally {
       setIsLoading(false);
     }
@@ -67,7 +75,7 @@ const NewFolderModal: React.FC<NewFolderModalProps> = ({
           </div>
           
           <DialogFooter className="mt-4">
-            <Button variant="outline" type="button" onClick={onClose}>
+            <Button variant="outline" type="button" onClick={onClose} disabled={isLoading}>
               Cancel
             </Button>
             <Button type="submit" disabled={!folderName.trim() || isLoading}>

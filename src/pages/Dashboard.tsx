@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useLocation } from "react-router-dom";
 import AppLayout from "@/components/layout/AppLayout";
 import BreadcrumbNav from "@/components/files/BreadcrumbNav";
@@ -39,7 +38,6 @@ const Dashboard: React.FC = () => {
   const [isNewFolderModalOpen, setIsNewFolderModalOpen] = useState(false);
   const [userFullName, setUserFullName] = useState<string | null>(null);
   
-  // Fetch user profile for welcome message
   useEffect(() => {
     const fetchUserProfile = async () => {
       if (user) {
@@ -47,7 +45,6 @@ const Dashboard: React.FC = () => {
         if (profile && profile.full_name) {
           setUserFullName(profile.full_name);
         } else if (user.email) {
-          // Fallback to email if no full name
           setUserFullName(user.email.split('@')[0]);
         }
       }
@@ -56,7 +53,6 @@ const Dashboard: React.FC = () => {
     fetchUserProfile();
   }, [user, getProfile]);
   
-  // Determine current view based on route
   const currentView = (): 'all' | 'starred' | 'shared' | 'trash' | 'recent' => {
     const path = location.pathname;
     if (path.includes('/starred')) return 'starred';
@@ -68,7 +64,6 @@ const Dashboard: React.FC = () => {
   
   const view = currentView();
   
-  // Fetch items (files and folders)
   const { 
     data: items = [],
     isLoading: itemsLoading,
@@ -80,7 +75,6 @@ const Dashboard: React.FC = () => {
     enabled: !!user
   });
   
-  // Fetch breadcrumbs
   const { 
     data: breadcrumbs = [],
     isLoading: breadcrumbsLoading
@@ -90,7 +84,6 @@ const Dashboard: React.FC = () => {
     enabled: !!folderId && !!user
   });
   
-  // Fetch storage stats
   const { 
     data: storageData,
     isLoading: storageLoading 
@@ -100,7 +93,6 @@ const Dashboard: React.FC = () => {
     enabled: !!user
   });
   
-  // Handle file upload
   const handleUploadClick = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     
@@ -113,7 +105,6 @@ const Dashboard: React.FC = () => {
         description: `${files.length} file(s) uploaded successfully.`,
       });
       
-      // Refresh data
       queryClient.invalidateQueries({ queryKey: ['items'] });
       queryClient.invalidateQueries({ queryKey: ['storage-stats'] });
     } catch (error) {
@@ -126,8 +117,7 @@ const Dashboard: React.FC = () => {
     }
   };
   
-  // Handle folder creation
-  const handleCreateFolder = async (name: string) => {
+  const handleCreateFolder = useCallback(async (name: string) => {
     try {
       await createFolder(name, folderId || null);
       
@@ -136,8 +126,8 @@ const Dashboard: React.FC = () => {
         description: `"${name}" folder has been created.`,
       });
       
-      // Refresh data
       queryClient.invalidateQueries({ queryKey: ['items'] });
+      setIsNewFolderModalOpen(false);
     } catch (error) {
       console.error("Create folder error:", error);
       toast({
@@ -146,23 +136,18 @@ const Dashboard: React.FC = () => {
         description: "An error occurred while creating the folder.",
       });
     }
-  };
+  }, [folderId, queryClient, toast]);
   
-  // Handle item click (navigate into folders)
   const handleItemClick = (item: FileItem) => {
     if (item.type === "folder") {
-      // Reset search results when navigating
       setSearchResults(null);
     }
   };
   
-  // Handle breadcrumb navigation
   const handleBreadcrumbNavigate = (item: { id: string; name: string } | null) => {
-    // Reset search results when navigating
     setSearchResults(null);
   };
   
-  // Handle star/unstar
   const handleStarClick = async (file: FileItem, starred: boolean) => {
     try {
       await starItem(file, starred);
@@ -172,7 +157,6 @@ const Dashboard: React.FC = () => {
         description: `"${file.name}" has been ${starred ? "added to" : "removed from"} starred items.`,
       });
       
-      // Refresh data
       queryClient.invalidateQueries({ queryKey: ['items'] });
     } catch (error) {
       console.error("Star error:", error);
@@ -184,12 +168,10 @@ const Dashboard: React.FC = () => {
     }
   };
   
-  // Handle share
   const handleShareClick = (file: FileItem) => {
     setShareItem(file);
   };
   
-  // Handle download
   const handleDownloadClick = async (file: FileItem) => {
     try {
       toast({
@@ -199,7 +181,6 @@ const Dashboard: React.FC = () => {
       
       const { url, fileName } = await downloadFile(file.id);
       
-      // Create a temporary anchor element and simulate click
       const a = document.createElement('a');
       a.href = url;
       a.download = fileName;
@@ -221,18 +202,15 @@ const Dashboard: React.FC = () => {
     }
   };
   
-  // Handle delete/trash
   const handleDeleteClick = async (file: FileItem) => {
     try {
       if (view === 'trash') {
-        // Permanent delete from trash
         await deleteItemPermanently(file);
         toast({
           title: "Deleted permanently",
           description: `"${file.name}" has been permanently deleted.`,
         });
       } else {
-        // Move to trash
         await trashItem(file);
         toast({
           title: "Moved to trash",
@@ -240,7 +218,6 @@ const Dashboard: React.FC = () => {
         });
       }
       
-      // Refresh data
       queryClient.invalidateQueries({ queryKey: ['items'] });
       queryClient.invalidateQueries({ queryKey: ['storage-stats'] });
     } catch (error) {
@@ -253,7 +230,6 @@ const Dashboard: React.FC = () => {
     }
   };
   
-  // Handle restore from trash
   const handleRestoreClick = async (file: FileItem) => {
     try {
       await restoreItem(file);
@@ -263,7 +239,6 @@ const Dashboard: React.FC = () => {
         description: `"${file.name}" has been restored.`,
       });
       
-      // Refresh data
       queryClient.invalidateQueries({ queryKey: ['items'] });
     } catch (error) {
       console.error("Restore error:", error);
@@ -275,12 +250,10 @@ const Dashboard: React.FC = () => {
     }
   };
   
-  // Handle search results
   const handleSearch = (results: { files: FileItem[], folders: FileItem[] }) => {
     setSearchResults([...results.folders, ...results.files]);
   };
   
-  // Display items - either search results or regular items
   const displayItems = searchResults || items;
   
   return (
@@ -445,7 +418,6 @@ const Dashboard: React.FC = () => {
         onCreateFolder={handleCreateFolder}
       />
       
-      {/* Hidden file input for uploads */}
       <input
         id="file-upload"
         type="file"
