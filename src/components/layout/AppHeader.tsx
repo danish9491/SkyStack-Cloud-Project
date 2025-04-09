@@ -11,7 +11,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Menu, Search, Bell, User, Settings, LogOut } from "lucide-react";
+import {
+  Menu,
+  Search,
+  Bell,
+  User,
+  Settings,
+  LogOut,
+  Shield,
+} from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useAuth } from "@/context/AuthContext";
 import { useNavigate } from "react-router-dom";
@@ -24,10 +32,23 @@ type AppHeaderProps = {
 };
 
 const AppHeader: React.FC<AppHeaderProps> = ({ toggleSidebar, onSearch }) => {
-  const { user, signOut } = useAuth();
+  const { user, signOut, getProfile } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [userProfile, setUserProfile] = useState<any>(null);
+
+  // Fetch user profile data
+  React.useEffect(() => {
+    const fetchProfile = async () => {
+      if (user) {
+        const profile = await getProfile();
+        setUserProfile(profile);
+      }
+    };
+    
+    fetchProfile();
+  }, [user, getProfile]);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,9 +75,26 @@ const AppHeader: React.FC<AppHeaderProps> = ({ toggleSidebar, onSearch }) => {
 
   // Get user initials for avatar
   const getUserInitials = () => {
-    if (!user) return "U";
-    const email = user.email || "";
-    return email.substring(0, 2).toUpperCase();
+    if (userProfile?.full_name) {
+      return userProfile.full_name
+        .split(' ')
+        .map((n: string) => n[0])
+        .join('')
+        .toUpperCase();
+    }
+    
+    if (user?.email) {
+      return user.email.substring(0, 2).toUpperCase();
+    }
+    
+    return "U";
+  };
+  
+  const handleNotificationClick = () => {
+    toast({
+      title: "Notifications",
+      description: "You have no new notifications",
+    });
   };
 
   return (
@@ -80,12 +118,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({ toggleSidebar, onSearch }) => {
           variant="ghost" 
           size="icon" 
           className="relative"
-          onClick={() => {
-            toast({
-              title: "Notifications",
-              description: "No new notifications",
-            });
-          }}
+          onClick={handleNotificationClick}
         >
           <Bell className="h-5 w-5" />
           <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
@@ -95,6 +128,9 @@ const AppHeader: React.FC<AppHeaderProps> = ({ toggleSidebar, onSearch }) => {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="relative h-9 w-9 rounded-full">
               <Avatar className="h-9 w-9">
+                {userProfile?.avatar_url && (
+                  <AvatarImage src={userProfile.avatar_url} alt="User avatar" />
+                )}
                 <AvatarFallback className="bg-aigility-purple text-white">
                   {getUserInitials()}
                 </AvatarFallback>
@@ -102,13 +138,18 @@ const AppHeader: React.FC<AppHeaderProps> = ({ toggleSidebar, onSearch }) => {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuLabel>My Account</DropdownMenuLabel>
+            <DropdownMenuLabel>
+              {userProfile?.full_name || user?.email || 'My Account'}
+            </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => navigate("/profile")}>
               <User className="mr-2 h-4 w-4" />Profile
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => navigate("/settings")}>
               <Settings className="mr-2 h-4 w-4" />Settings
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate("/security")}>
+              <Shield className="mr-2 h-4 w-4" />Security
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => signOut()}>

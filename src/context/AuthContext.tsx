@@ -138,18 +138,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const getProfile = async () => {
     if (!user) return null;
     
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single();
-    
-    if (error) {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+      
+      if (error) throw error;
+      
+      return data;
+    } catch (error) {
       console.error('Error fetching profile:', error);
       return null;
     }
-    
-    return data;
   };
 
   return (

@@ -9,6 +9,7 @@ import StorageStats from "@/components/files/StorageStats";
 import ShareModal from "@/components/files/ShareModal";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
+import NewFolderModal from "@/components/files/NewFolderModal";
 import {
   fetchAllItems,
   createFolder,
@@ -16,7 +17,7 @@ import {
   trashItem,
   restoreItem,
   deleteItemPermanently,
-  shareFile,
+  shareFile as shareFileService,
   uploadFile,
   downloadFile,
   getBreadcrumbPath,
@@ -29,12 +30,31 @@ const Dashboard: React.FC = () => {
   const { folderId } = useParams<{ folderId: string }>();
   const location = useLocation();
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, getProfile } = useAuth();
   const queryClient = useQueryClient();
   
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const [shareFile, setShareFile] = useState<FileItem | null>(null);
+  const [shareItem, setShareItem] = useState<FileItem | null>(null);
   const [searchResults, setSearchResults] = useState<FileItem[] | null>(null);
+  const [isNewFolderModalOpen, setIsNewFolderModalOpen] = useState(false);
+  const [userFullName, setUserFullName] = useState<string | null>(null);
+  
+  // Fetch user profile for welcome message
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      if (user) {
+        const profile = await getProfile();
+        if (profile && profile.full_name) {
+          setUserFullName(profile.full_name);
+        } else if (user.email) {
+          // Fallback to email if no full name
+          setUserFullName(user.email.split('@')[0]);
+        }
+      }
+    };
+    
+    fetchUserProfile();
+  }, [user, getProfile]);
   
   // Determine current view based on route
   const currentView = (): 'all' | 'starred' | 'shared' | 'trash' | 'recent' => {
@@ -166,7 +186,7 @@ const Dashboard: React.FC = () => {
   
   // Handle share
   const handleShareClick = (file: FileItem) => {
-    setShareFile(file);
+    setShareItem(file);
   };
   
   // Handle download
@@ -266,6 +286,10 @@ const Dashboard: React.FC = () => {
   return (
     <AppLayout onSearch={handleSearch}>
       <div className="space-y-4">
+        {userFullName && (
+          <h1 className="text-2xl font-bold">Welcome back, {userFullName}</h1>
+        )}
+        
         {!searchResults && (
           <BreadcrumbNav 
             items={breadcrumbs} 
@@ -289,7 +313,7 @@ const Dashboard: React.FC = () => {
         
         <FileActions
           onUploadClick={handleUploadClick}
-          onCreateFolder={handleCreateFolder}
+          onCreateFolder={() => setIsNewFolderModalOpen(true)}
           viewMode={viewMode}
           onViewModeChange={setViewMode}
           showRestoreAll={view === 'trash' && displayItems.length > 0}
@@ -363,7 +387,7 @@ const Dashboard: React.FC = () => {
                 {!searchResults && view === 'all' && (
                   <div className="flex gap-3">
                     <Button onClick={() => document.getElementById('file-upload')?.click()}>Upload Files</Button>
-                    <Button variant="outline" onClick={() => handleCreateFolder("New Folder")}>
+                    <Button variant="outline" onClick={() => setIsNewFolderModalOpen(true)}>
                       Create Folder
                     </Button>
                   </div>
@@ -377,31 +401,31 @@ const Dashboard: React.FC = () => {
               usedStorage={storageData?.usedStorage || 0}
               totalStorage={storageData?.totalStorage || 15 * 1024 * 1024 * 1024}
               breakdown={storageData?.breakdown || []}
-              isLoading={storageLoading}
+              loading={storageLoading}
               className="sticky top-6"
             />
           </div>
         </div>
       </div>
       
-      {shareFile && (
+      {shareItem && (
         <ShareModal 
-          file={shareFile} 
-          onClose={() => setShareFile(null)}
+          file={shareItem} 
+          onClose={() => setShareItem(null)}
           onShare={async (email, accessLevel, expiresIn) => {
             try {
               const expiryDate = expiresIn === 'never' 
                 ? null 
                 : new Date(Date.now() + parseInt(expiresIn) * 24 * 60 * 60 * 1000);
                 
-              await shareFile(shareFile.id, email, accessLevel as 'view' | 'edit', expiryDate);
+              await shareFileService(shareItem.id, email, accessLevel as 'view' | 'edit', expiryDate);
               
               toast({
                 title: "File shared",
-                description: `"${shareFile.name}" has been shared with ${email}.`,
+                description: `"${shareItem.name}" has been shared with ${email}.`,
               });
               
-              setShareFile(null);
+              setShareItem(null);
               queryClient.invalidateQueries({ queryKey: ['items'] });
             } catch (error) {
               console.error("Share error:", error);
@@ -414,6 +438,12 @@ const Dashboard: React.FC = () => {
           }}
         />
       )}
+      
+      <NewFolderModal
+        isOpen={isNewFolderModalOpen}
+        onClose={() => setIsNewFolderModalOpen(false)}
+        onCreateFolder={handleCreateFolder}
+      />
       
       {/* Hidden file input for uploads */}
       <input

@@ -1,6 +1,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { FileItem } from "@/components/files/FileGrid";
+import { Database } from "@/integrations/supabase/types";
 
 export async function fetchFiles(folderId: string | null = null, view: 'all' | 'starred' | 'shared' | 'trash' | 'recent' = 'all') {
   try {
@@ -80,10 +81,18 @@ export async function fetchAllItems(folderId: string | null = null, view: 'all' 
 
 export async function createFolder(name: string, parentFolderId: string | null = null) {
   try {
-    const { data, error } = await supabase.from('folders').insert({
-      name,
-      parent_folder_id: parentFolderId,
-    }).select().single();
+    const user = supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+
+    const { data, error } = await supabase
+      .from('folders')
+      .insert({
+        name,
+        parent_folder_id: parentFolderId,
+        user_id: (await user).data.user?.id
+      })
+      .select()
+      .single();
     
     if (error) throw error;
     
@@ -198,17 +207,27 @@ export async function deleteItemPermanently(item: FileItem) {
 
 export async function shareFile(fileId: string, email: string, accessLevel: 'view' | 'edit', expiresAt: Date | null = null) {
   try {
-    const { data, error } = await supabase.from('shared_files').insert({
-      file_id: fileId,
-      shared_with: email,
-      access_level: accessLevel,
-      expires_at: expiresAt,
-    }).select();
+    const user = supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
+
+    const { data, error } = await supabase
+      .from('shared_files')
+      .insert({
+        file_id: fileId,
+        shared_with: email,
+        shared_by: (await user).data.user?.id,
+        access_level: accessLevel,
+        expires_at: expiresAt
+      })
+      .select();
     
     if (error) throw error;
     
     // Update the file to mark it as shared
-    await supabase.from('files').update({ shared: true }).eq('id', fileId);
+    await supabase
+      .from('files')
+      .update({ shared: true })
+      .eq('id', fileId);
     
     return data;
   } catch (error) {
@@ -228,15 +247,24 @@ export async function uploadFile(file: File, parentFolderId: string | null = nul
       .upload(filePath, file);
     
     if (storageError) throw storageError;
+
+    // Get current user
+    const user = supabase.auth.getUser();
+    if (!user) throw new Error("User not authenticated");
     
     // Create a record in the files table
-    const { data, error } = await supabase.from('files').insert({
-      name: file.name,
-      file_path: filePath,
-      file_type: file.type,
-      size: file.size,
-      parent_folder_id: parentFolderId,
-    }).select().single();
+    const { data, error } = await supabase
+      .from('files')
+      .insert({
+        name: file.name,
+        file_path: filePath,
+        file_type: file.type,
+        size: file.size,
+        parent_folder_id: parentFolderId,
+        user_id: (await user).data.user?.id
+      })
+      .select()
+      .single();
     
     if (error) throw error;
     
@@ -256,7 +284,7 @@ export async function downloadFile(fileId: string) {
       .eq('id', fileId)
       .single();
     
-    if (fileError) throw fileError;
+    if (fileError || !fileData) throw fileError || new Error("File not found");
     
     // Get download URL
     const { data, error } = await supabase.storage
@@ -286,10 +314,13 @@ export async function getBreadcrumbPath(folderId: string | null) {
         .eq('id', currentFolderId)
         .single();
       
-      if (error) throw error;
-      if (!data) break;
+      if (error || !data) break;
       
-      breadcrumbs.unshift({ id: data.id, name: data.name });
+      breadcrumbs.unshift({ 
+        id: data.id, 
+        name: data.name 
+      });
+      
       currentFolderId = data.parent_folder_id;
     }
     
@@ -317,27 +348,29 @@ export async function getStorageStats() {
       other: 0,
     };
     
-    files?.forEach(file => {
-      const size = file.size || 0;
-      totalSize += size;
-      
-      const fileType = file.file_type || '';
-      if (fileType.includes('image')) {
-        typeBreakdown.images += size;
-      } else if (fileType.includes('video')) {
-        typeBreakdown.videos += size;
-      } else if (
-        fileType.includes('pdf') ||
-        fileType.includes('doc') ||
-        fileType.includes('sheet') ||
-        fileType.includes('text') ||
-        fileType.includes('presentation')
-      ) {
-        typeBreakdown.documents += size;
-      } else {
-        typeBreakdown.other += size;
-      }
-    });
+    if (files) {
+      files.forEach(file => {
+        const size = file.size || 0;
+        totalSize += size;
+        
+        const fileType = file.file_type || '';
+        if (fileType.includes('image')) {
+          typeBreakdown.images += size;
+        } else if (fileType.includes('video')) {
+          typeBreakdown.videos += size;
+        } else if (
+          fileType.includes('pdf') ||
+          fileType.includes('doc') ||
+          fileType.includes('sheet') ||
+          fileType.includes('text') ||
+          fileType.includes('presentation')
+        ) {
+          typeBreakdown.documents += size;
+        } else {
+          typeBreakdown.other += size;
+        }
+      });
+    }
     
     return {
       usedStorage: totalSize,
