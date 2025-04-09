@@ -15,15 +15,20 @@ import { Label } from "@/components/ui/label";
 import { Copy, Link, Clock } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import type { FileItem } from "./FileGrid";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type ShareModalProps = {
   file: FileItem | null;
   onClose: () => void;
+  onShare?: (email: string, accessLevel: string, expiresIn: string) => void;
 };
 
-const ShareModal: React.FC<ShareModalProps> = ({ file, onClose }) => {
+const ShareModal: React.FC<ShareModalProps> = ({ file, onClose, onShare }) => {
   const [isPublic, setIsPublic] = useState(true);
   const [expiresIn, setExpiresIn] = useState("never");
+  const [email, setEmail] = useState("");
+  const [accessLevel, setAccessLevel] = useState("view");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   
   // Generate a fake share link for demo purposes
@@ -35,6 +40,38 @@ const ShareModal: React.FC<ShareModalProps> = ({ file, onClose }) => {
       title: "Link copied",
       description: "Share link has been copied to clipboard",
     });
+  };
+  
+  const handleShare = async () => {
+    if (!file || !onShare) return;
+    
+    if (!email.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Email required",
+        description: "Please enter an email address to share with.",
+      });
+      return;
+    }
+    
+    // Simple email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      toast({
+        variant: "destructive",
+        title: "Invalid email",
+        description: "Please enter a valid email address.",
+      });
+      return;
+    }
+    
+    setIsSubmitting(true);
+    
+    try {
+      await onShare(email, accessLevel, expiresIn);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
   
   if (!file) return null;
@@ -50,6 +87,30 @@ const ShareModal: React.FC<ShareModalProps> = ({ file, onClose }) => {
         </DialogHeader>
         
         <div className="space-y-4 py-2">
+          <div>
+            <Label htmlFor="email">Share with</Label>
+            <Input
+              id="email"
+              placeholder="Enter email address"
+              className="mt-1.5"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </div>
+          
+          <div>
+            <Label htmlFor="access-level">Access level</Label>
+            <Select value={accessLevel} onValueChange={setAccessLevel}>
+              <SelectTrigger className="mt-1.5">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="view">View only</SelectItem>
+                <SelectItem value="edit">View and edit</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
               <Label>Public link</Label>
@@ -84,26 +145,29 @@ const ShareModal: React.FC<ShareModalProps> = ({ file, onClose }) => {
           
           <div>
             <Label>Link expiration</Label>
-            <div className="flex items-center mt-1.5 space-x-2">
-              <Clock className="h-4 w-4 text-muted-foreground" />
-              <select
-                value={expiresIn}
-                onChange={(e) => setExpiresIn(e.target.value)}
-                className="bg-background text-sm border-0 focus:ring-0"
-              >
-                <option value="never">Never expires</option>
-                <option value="1d">1 day</option>
-                <option value="7d">7 days</option>
-                <option value="30d">30 days</option>
-                <option value="custom">Custom</option>
-              </select>
-            </div>
+            <Select value={expiresIn} onValueChange={setExpiresIn}>
+              <SelectTrigger className="mt-1.5">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="never">Never expires</SelectItem>
+                <SelectItem value="1">1 day</SelectItem>
+                <SelectItem value="7">7 days</SelectItem>
+                <SelectItem value="30">30 days</SelectItem>
+                <SelectItem value="90">90 days</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
         
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button>Create link</Button>
+          <Button 
+            onClick={handleShare} 
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? "Sharing..." : "Share"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

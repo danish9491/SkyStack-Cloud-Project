@@ -22,8 +22,10 @@ import {
   FileVideo,
   Music,
   Package,
+  Undo2,
 } from "lucide-react";
 import FilePreviewModal from "./FilePreviewModal";
+import { useNavigate, useLocation } from "react-router-dom";
 
 export type FileItem = {
   id: string;
@@ -35,6 +37,8 @@ export type FileItem = {
   updatedAt: string;
   starred?: boolean;
   shared?: boolean;
+  filePath?: string;
+  parentFolderId?: string | null;
 };
 
 type FileGridProps = {
@@ -44,7 +48,9 @@ type FileGridProps = {
   onDeleteClick: (file: FileItem) => void;
   onStarClick: (file: FileItem, starred: boolean) => void;
   onDownloadClick: (file: FileItem) => void;
+  onRestoreClick?: (file: FileItem) => void;
   viewMode?: "grid" | "list";
+  isTrashView?: boolean;
 };
 
 const getFileIcon = (fileType?: string) => {
@@ -66,21 +72,27 @@ const FileGrid: React.FC<FileGridProps> = ({
   onDeleteClick,
   onStarClick,
   onDownloadClick,
+  onRestoreClick,
   viewMode = "grid",
+  isTrashView = false,
 }) => {
   const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const handleItemClick = (file: FileItem) => {
-    if (file.type === "file") {
-      setPreviewFile(file);
+    if (file.type === "folder") {
+      navigate(`/folder/${file.id}`);
+      onItemClick(file);
     } else {
+      setPreviewFile(file);
       onItemClick(file);
     }
   };
 
   return (
     <>
-      <div className={viewMode === "grid" ? "file-grid" : "file-list"}>
+      <div className={`grid gap-4 ${viewMode === "grid" ? "grid-cols-2 md:grid-cols-3 lg:grid-cols-4" : ""}`}>
         {files.map((file) => (
           <Card
             key={file.id}
@@ -121,7 +133,12 @@ const FileGrid: React.FC<FileGridProps> = ({
                 
                 <div className={viewMode === "list" ? "flex-1" : ""}>
                   <div className="flex items-center justify-between">
-                    <h3 className={`font-medium ${viewMode === "grid" ? "truncate" : ""}`}>{file.name}</h3>
+                    <h3 className={`font-medium ${viewMode === "grid" ? "truncate" : ""}`}>
+                      {file.name}
+                      {file.shared && !isTrashView && (
+                        <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded">Shared</span>
+                      )}
+                    </h3>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                         <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100">
@@ -129,31 +146,46 @@ const FileGrid: React.FC<FileGridProps> = ({
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        {file.type === "file" && (
-                          <DropdownMenuItem onClick={(e) => {
-                            e.stopPropagation();
-                            onDownloadClick(file);
-                          }}>
-                            <Download className="h-4 w-4 mr-2" /> Download
-                          </DropdownMenuItem>
+                        {!isTrashView && (
+                          <>
+                            {file.type === "file" && (
+                              <DropdownMenuItem onClick={(e) => {
+                                e.stopPropagation();
+                                onDownloadClick(file);
+                              }}>
+                                <Download className="h-4 w-4 mr-2" /> Download
+                              </DropdownMenuItem>
+                            )}
+                            
+                            <DropdownMenuItem onClick={(e) => {
+                              e.stopPropagation();
+                              onShareClick(file);
+                            }}>
+                              <Share2 className="h-4 w-4 mr-2" /> Share
+                            </DropdownMenuItem>
+                            
+                            <DropdownMenuItem onClick={(e) => {
+                              e.stopPropagation();
+                              onStarClick(file, !file.starred);
+                            }}>
+                              <Star className={`h-4 w-4 mr-2 ${file.starred ? "fill-yellow-400" : ""}`} /> 
+                              {file.starred ? "Unstar" : "Star"}
+                            </DropdownMenuItem>
+                            
+                            <DropdownMenuSeparator />
+                          </>
                         )}
                         
-                        <DropdownMenuItem onClick={(e) => {
-                          e.stopPropagation();
-                          onShareClick(file);
-                        }}>
-                          <Share2 className="h-4 w-4 mr-2" /> Share
-                        </DropdownMenuItem>
-                        
-                        <DropdownMenuItem onClick={(e) => {
-                          e.stopPropagation();
-                          onStarClick(file, !file.starred);
-                        }}>
-                          <Star className={`h-4 w-4 mr-2 ${file.starred ? "fill-yellow-400" : ""}`} /> 
-                          {file.starred ? "Unstar" : "Star"}
-                        </DropdownMenuItem>
-                        
-                        <DropdownMenuSeparator />
+                        {isTrashView && onRestoreClick && (
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onRestoreClick(file);
+                            }}
+                          >
+                            <Undo2 className="h-4 w-4 mr-2" /> Restore
+                          </DropdownMenuItem>
+                        )}
                         
                         <DropdownMenuItem 
                           className="text-red-500 focus:text-red-500" 
@@ -162,7 +194,8 @@ const FileGrid: React.FC<FileGridProps> = ({
                             onDeleteClick(file);
                           }}
                         >
-                          <Trash2 className="h-4 w-4 mr-2" /> Move to trash
+                          <Trash2 className="h-4 w-4 mr-2" /> 
+                          {isTrashView ? "Delete permanently" : "Move to trash"}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>

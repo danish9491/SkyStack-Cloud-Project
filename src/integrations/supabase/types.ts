@@ -9,13 +9,163 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      files: {
+        Row: {
+          created_at: string
+          file_path: string
+          file_type: string | null
+          id: string
+          is_starred: boolean | null
+          is_trashed: boolean | null
+          name: string
+          parent_folder_id: string | null
+          shared: boolean | null
+          size: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          file_path: string
+          file_type?: string | null
+          id?: string
+          is_starred?: boolean | null
+          is_trashed?: boolean | null
+          name: string
+          parent_folder_id?: string | null
+          shared?: boolean | null
+          size?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          file_path?: string
+          file_type?: string | null
+          id?: string
+          is_starred?: boolean | null
+          is_trashed?: boolean | null
+          name?: string
+          parent_folder_id?: string | null
+          shared?: boolean | null
+          size?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      folders: {
+        Row: {
+          created_at: string
+          id: string
+          is_starred: boolean | null
+          is_trashed: boolean | null
+          name: string
+          parent_folder_id: string | null
+          shared: boolean | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_starred?: boolean | null
+          is_trashed?: boolean | null
+          name: string
+          parent_folder_id?: string | null
+          shared?: boolean | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_starred?: boolean | null
+          is_trashed?: boolean | null
+          name?: string
+          parent_folder_id?: string | null
+          shared?: boolean | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          full_name: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          full_name?: string | null
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      shared_files: {
+        Row: {
+          access_level: string | null
+          created_at: string
+          expires_at: string | null
+          file_id: string
+          id: string
+          shared_by: string
+          shared_with: string | null
+        }
+        Insert: {
+          access_level?: string | null
+          created_at?: string
+          expires_at?: string | null
+          file_id: string
+          id?: string
+          shared_by: string
+          shared_with?: string | null
+        }
+        Update: {
+          access_level?: string | null
+          created_at?: string
+          expires_at?: string | null
+          file_id?: string
+          id?: string
+          shared_by?: string
+          shared_with?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shared_files_file_id_fkey"
+            columns: ["file_id"]
+            isOneToOne: false
+            referencedRelation: "files"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_shared_file: {
+        Args: { share_id: string }
+        Returns: {
+          file_path: string
+          file_type: string
+          name: string
+          size: number
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never

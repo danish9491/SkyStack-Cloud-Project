@@ -14,14 +14,17 @@ import {
   List,
   ChevronDown,
   FolderPlus,
+  Undo2,
 } from "lucide-react";
 import NewFolderModal from "./NewFolderModal";
 
 type FileActionsProps = {
-  onUploadClick: () => void;
+  onUploadClick: (files: FileList | null) => void;
   onCreateFolder: (name: string) => void;
   viewMode: "grid" | "list";
   onViewModeChange: (mode: "grid" | "list") => void;
+  showRestoreAll?: boolean;
+  onRestoreAll?: () => void;
 };
 
 const FileActions: React.FC<FileActionsProps> = ({
@@ -29,13 +32,24 @@ const FileActions: React.FC<FileActionsProps> = ({
   onCreateFolder,
   viewMode,
   onViewModeChange,
+  showRestoreAll = false,
+  onRestoreAll,
 }) => {
   const [isNewFolderModalOpen, setIsNewFolderModalOpen] = useState(false);
+  
+  // Create a ref for the file input
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  
+  const handleUploadButtonClick = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
   
   return (
     <div className="flex flex-col sm:flex-row gap-2 justify-between items-start sm:items-center">
       <div className="flex gap-2">
-        <Button className="gap-2" onClick={onUploadClick}>
+        <Button className="gap-2" onClick={handleUploadButtonClick}>
           <Upload className="h-4 w-4" />
           <span className="hidden sm:inline">Upload</span>
         </Button>
@@ -55,6 +69,13 @@ const FileActions: React.FC<FileActionsProps> = ({
             {/* Can add more items here, like "New Document" etc. */}
           </DropdownMenuContent>
         </DropdownMenu>
+        
+        {showRestoreAll && onRestoreAll && (
+          <Button variant="outline" onClick={onRestoreAll} className="gap-2">
+            <Undo2 className="h-4 w-4" />
+            <span className="hidden sm:inline">Restore All</span>
+          </Button>
+        )}
       </div>
       
       <div className="flex gap-1 p-0.5 bg-muted rounded-md">
@@ -80,6 +101,15 @@ const FileActions: React.FC<FileActionsProps> = ({
         isOpen={isNewFolderModalOpen}
         onClose={() => setIsNewFolderModalOpen(false)}
         onCreateFolder={onCreateFolder}
+      />
+      
+      {/* Hidden file input for file uploads */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        onChange={(e) => onUploadClick(e.target.files)}
+        className="hidden"
       />
     </div>
   );

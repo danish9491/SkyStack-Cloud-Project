@@ -23,13 +23,60 @@ import {
   Upload,
   PlusCircle
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { getStorageStats } from "@/services/fileService";
 
 const AppSidebar = () => {
-  // Mock storage data - would come from Supabase in a real app
-  const storageUsed = 2.5; // GB
-  const storageTotal = 15; // GB
+  const location = useLocation();
+  const navigate = useNavigate();
+  
+  const { data: storageData } = useQuery({
+    queryKey: ['storage-stats'],
+    queryFn: getStorageStats,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  });
+  
+  // Calculate storage usage
+  const storageUsed = storageData?.usedStorage || 0;
+  const storageTotal = storageData?.totalStorage || 15 * 1024 * 1024 * 1024; // 15 GB
   const storagePercentage = (storageUsed / storageTotal) * 100;
+  
+  // Format storage size
+  const formatStorage = (bytes: number) => {
+    if (bytes < 1024 * 1024) {
+      return `${(bytes / 1024).toFixed(2)} KB`;
+    } else if (bytes < 1024 * 1024 * 1024) {
+      return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+    } else {
+      return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+    }
+  };
+  
+  const handleUploadClick = () => {
+    document.getElementById('file-upload')?.click();
+    navigate("/dashboard");
+  };
+  
+  const handleNewFolderClick = () => {
+    // Navigate to dashboard and open the new folder modal from there
+    navigate("/dashboard");
+    // Wait for the navigation to complete
+    setTimeout(() => {
+      // Find the New button and trigger a click
+      const newButton = document.querySelector('button:has(.lucide-plus-circle)');
+      if (newButton) {
+        (newButton as HTMLButtonElement).click();
+        // Find the New Folder option and click it
+        setTimeout(() => {
+          const newFolderOption = document.querySelector('[role="menuitem"]:has(.lucide-folder-plus)');
+          if (newFolderOption) {
+            (newFolderOption as HTMLElement).click();
+          }
+        }, 100);
+      }
+    }, 100);
+  };
 
   return (
     <Sidebar>
@@ -44,11 +91,11 @@ const AppSidebar = () => {
       
       <SidebarContent className="px-2">
         <div className="px-2 mb-6 flex flex-col gap-2">
-          <Button className="w-full justify-start gap-2" onClick={() => {}}>
+          <Button className="w-full justify-start gap-2" onClick={handleUploadClick}>
             <Upload className="h-4 w-4" />
             <span>Upload</span>
           </Button>
-          <Button variant="outline" className="w-full justify-start gap-2" onClick={() => {}}>
+          <Button variant="outline" className="w-full justify-start gap-2" onClick={handleNewFolderClick}>
             <PlusCircle className="h-4 w-4" />
             <span>New Folder</span>
           </Button>
@@ -59,8 +106,11 @@ const AppSidebar = () => {
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <Link to="/" className="flex items-center gap-3">
+                <SidebarMenuButton 
+                  asChild
+                  isActive={location.pathname === '/dashboard' || location.pathname.includes('/folder/')}
+                >
+                  <Link to="/dashboard" className="flex items-center gap-3">
                     <HardDrive className="h-4 w-4" />
                     <span>My Drive</span>
                   </Link>
@@ -68,7 +118,10 @@ const AppSidebar = () => {
               </SidebarMenuItem>
               
               <SidebarMenuItem>
-                <SidebarMenuButton asChild>
+                <SidebarMenuButton 
+                  asChild
+                  isActive={location.pathname === '/recent'}
+                >
                   <Link to="/recent" className="flex items-center gap-3">
                     <Clock className="h-4 w-4" />
                     <span>Recent</span>
@@ -77,7 +130,10 @@ const AppSidebar = () => {
               </SidebarMenuItem>
               
               <SidebarMenuItem>
-                <SidebarMenuButton asChild>
+                <SidebarMenuButton 
+                  asChild
+                  isActive={location.pathname === '/starred'}
+                >
                   <Link to="/starred" className="flex items-center gap-3">
                     <Star className="h-4 w-4" />
                     <span>Starred</span>
@@ -86,7 +142,10 @@ const AppSidebar = () => {
               </SidebarMenuItem>
               
               <SidebarMenuItem>
-                <SidebarMenuButton asChild>
+                <SidebarMenuButton 
+                  asChild
+                  isActive={location.pathname === '/shared'}
+                >
                   <Link to="/shared" className="flex items-center gap-3">
                     <Share2 className="h-4 w-4" />
                     <span>Shared</span>
@@ -95,7 +154,10 @@ const AppSidebar = () => {
               </SidebarMenuItem>
               
               <SidebarMenuItem>
-                <SidebarMenuButton asChild>
+                <SidebarMenuButton 
+                  asChild
+                  isActive={location.pathname === '/trash'}
+                >
                   <Link to="/trash" className="flex items-center gap-3">
                     <Trash2 className="h-4 w-4" />
                     <span>Trash</span>
@@ -111,7 +173,7 @@ const AppSidebar = () => {
         <div className="space-y-2">
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Storage</span>
-            <span className="font-medium">{storageUsed} GB of {storageTotal} GB</span>
+            <span className="font-medium">{formatStorage(storageUsed)} of {formatStorage(storageTotal)}</span>
           </div>
           <Progress value={storagePercentage} className="h-2" />
         </div>

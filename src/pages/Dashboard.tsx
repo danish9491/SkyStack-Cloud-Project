@@ -1,4 +1,6 @@
-import React, { useState } from "react";
+
+import React, { useState, useEffect } from "react";
+import { useParams, useLocation } from "react-router-dom";
 import AppLayout from "@/components/layout/AppLayout";
 import BreadcrumbNav from "@/components/files/BreadcrumbNav";
 import FileGrid, { FileItem } from "@/components/files/FileGrid";
@@ -7,243 +9,420 @@ import StorageStats from "@/components/files/StorageStats";
 import ShareModal from "@/components/files/ShareModal";
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
-
-// Mock data for the demo
-const generateMockFiles = (): FileItem[] => {
-  return [
-    {
-      id: "folder-1",
-      name: "Work Documents",
-      type: "folder",
-      createdAt: "2025-03-15T10:30:00Z",
-      updatedAt: "2025-04-01T14:22:00Z",
-    },
-    {
-      id: "folder-2",
-      name: "Personal",
-      type: "folder",
-      createdAt: "2025-02-10T09:15:00Z",
-      updatedAt: "2025-03-28T16:45:00Z",
-    },
-    {
-      id: "file-1",
-      name: "Project Proposal.pdf",
-      type: "file",
-      fileType: "application/pdf",
-      size: 2.5 * 1024 * 1024, // 2.5 MB
-      createdAt: "2025-04-02T11:20:00Z",
-      updatedAt: "2025-04-02T11:20:00Z",
-      starred: true,
-    },
-    {
-      id: "file-2",
-      name: "Team Photo.jpg",
-      type: "file",
-      fileType: "image/jpeg",
-      size: 4.2 * 1024 * 1024, // 4.2 MB
-      createdAt: "2025-03-20T15:10:00Z",
-      updatedAt: "2025-03-20T15:10:00Z",
-    },
-    {
-      id: "file-3",
-      name: "Quarterly Report.docx",
-      type: "file",
-      fileType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      size: 1.8 * 1024 * 1024, // 1.8 MB
-      createdAt: "2025-04-05T09:45:00Z",
-      updatedAt: "2025-04-07T10:30:00Z",
-    },
-    {
-      id: "file-4",
-      name: "Presentation.pptx",
-      type: "file",
-      fileType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-      size: 6.7 * 1024 * 1024, // 6.7 MB
-      createdAt: "2025-04-01T13:25:00Z",
-      updatedAt: "2025-04-03T16:15:00Z",
-      shared: true,
-    },
-    {
-      id: "file-5",
-      name: "Budget.xlsx",
-      type: "file",
-      fileType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      size: 1.2 * 1024 * 1024, // 1.2 MB
-      createdAt: "2025-03-25T10:10:00Z",
-      updatedAt: "2025-04-04T11:50:00Z",
-    },
-    {
-      id: "file-6",
-      name: "Project Demo.mp4",
-      type: "file",
-      fileType: "video/mp4",
-      size: 28.5 * 1024 * 1024, // 28.5 MB
-      createdAt: "2025-03-30T14:20:00Z",
-      updatedAt: "2025-03-30T14:20:00Z",
-    },
-  ];
-};
-
-// Storage breakdown data for stats
-const storageBreakdown = [
-  { label: "Documents", size: 120 * 1024 * 1024, color: "#8B5CF6" },
-  { label: "Images", size: 450 * 1024 * 1024, color: "#3B82F6" },
-  { label: "Videos", size: 1.2 * 1024 * 1024 * 1024, color: "#10B981" },
-  { label: "Other", size: 230 * 1024 * 1024, color: "#F59E0B" },
-];
-
-type BreadcrumbItem = {
-  id: string;
-  name: string;
-};
+import {
+  fetchAllItems,
+  createFolder,
+  starItem,
+  trashItem,
+  restoreItem,
+  deleteItemPermanently,
+  shareFile,
+  uploadFile,
+  downloadFile,
+  getBreadcrumbPath,
+  getStorageStats
+} from "@/services/fileService";
+import { useAuth } from "@/context/AuthContext";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 const Dashboard: React.FC = () => {
-  const [files, setFiles] = useState<FileItem[]>(generateMockFiles());
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const [breadcrumbs, setBreadcrumbs] = useState<BreadcrumbItem[]>([]);
-  const [shareFile, setShareFile] = useState<FileItem | null>(null);
+  const { folderId } = useParams<{ folderId: string }>();
+  const location = useLocation();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
   
-  // Total storage stats
-  const totalStorage = 15 * 1024 * 1024 * 1024; // 15 GB
-  const usedStorage = storageBreakdown.reduce((total, item) => total + item.size, 0);
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [shareFile, setShareFile] = useState<FileItem | null>(null);
+  const [searchResults, setSearchResults] = useState<FileItem[] | null>(null);
   
-  const handleUploadClick = () => {
-    toast({
-      title: "Upload feature",
-      description: "This would open a file picker or drag-and-drop area in the real app.",
-    });
+  // Determine current view based on route
+  const currentView = (): 'all' | 'starred' | 'shared' | 'trash' | 'recent' => {
+    const path = location.pathname;
+    if (path.includes('/starred')) return 'starred';
+    if (path.includes('/shared')) return 'shared';
+    if (path.includes('/trash')) return 'trash';
+    if (path.includes('/recent')) return 'recent';
+    return 'all';
   };
   
-  const handleCreateFolder = (name: string) => {
-    const newFolder: FileItem = {
-      id: `folder-${Date.now()}`,
-      name,
-      type: "folder",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+  const view = currentView();
+  
+  // Fetch items (files and folders)
+  const { 
+    data: items = [],
+    isLoading: itemsLoading,
+    isError: itemsError, 
+    refetch: refetchItems
+  } = useQuery({
+    queryKey: ['items', folderId, view],
+    queryFn: () => fetchAllItems(folderId || null, view),
+    enabled: !!user
+  });
+  
+  // Fetch breadcrumbs
+  const { 
+    data: breadcrumbs = [],
+    isLoading: breadcrumbsLoading
+  } = useQuery({
+    queryKey: ['breadcrumbs', folderId],
+    queryFn: () => getBreadcrumbPath(folderId || null),
+    enabled: !!folderId && !!user
+  });
+  
+  // Fetch storage stats
+  const { 
+    data: storageData,
+    isLoading: storageLoading 
+  } = useQuery({
+    queryKey: ['storage-stats'],
+    queryFn: getStorageStats,
+    enabled: !!user
+  });
+  
+  // Handle file upload
+  const handleUploadClick = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
     
-    setFiles([newFolder, ...files]);
-    
-    toast({
-      title: "Folder created",
-      description: `"${name}" folder has been created.`,
-    });
+    try {
+      const uploadPromises = Array.from(files).map(file => uploadFile(file, folderId || null));
+      await Promise.all(uploadPromises);
+      
+      toast({
+        title: "Files uploaded",
+        description: `${files.length} file(s) uploaded successfully.`,
+      });
+      
+      // Refresh data
+      queryClient.invalidateQueries({ queryKey: ['items'] });
+      queryClient.invalidateQueries({ queryKey: ['storage-stats'] });
+    } catch (error) {
+      console.error("Upload error:", error);
+      toast({
+        variant: "destructive",
+        title: "Upload failed",
+        description: "Failed to upload files. Please try again.",
+      });
+    }
   };
   
+  // Handle folder creation
+  const handleCreateFolder = async (name: string) => {
+    try {
+      await createFolder(name, folderId || null);
+      
+      toast({
+        title: "Folder created",
+        description: `"${name}" folder has been created.`,
+      });
+      
+      // Refresh data
+      queryClient.invalidateQueries({ queryKey: ['items'] });
+    } catch (error) {
+      console.error("Create folder error:", error);
+      toast({
+        variant: "destructive",
+        title: "Failed to create folder",
+        description: "An error occurred while creating the folder.",
+      });
+    }
+  };
+  
+  // Handle item click (navigate into folders)
   const handleItemClick = (item: FileItem) => {
     if (item.type === "folder") {
-      // Navigate into the folder - in a real app, this would load the folder contents
-      setBreadcrumbs([...breadcrumbs, { id: item.id, name: item.name }]);
+      // Reset search results when navigating
+      setSearchResults(null);
+    }
+  };
+  
+  // Handle breadcrumb navigation
+  const handleBreadcrumbNavigate = (item: { id: string; name: string } | null) => {
+    // Reset search results when navigating
+    setSearchResults(null);
+  };
+  
+  // Handle star/unstar
+  const handleStarClick = async (file: FileItem, starred: boolean) => {
+    try {
+      await starItem(file, starred);
       
-      // For demo, we'll just show fewer files when navigating deeper
-      const mockSubfolderFiles = generateMockFiles().slice(0, 4);
-      setFiles(mockSubfolderFiles);
+      toast({
+        title: starred ? "Added to starred" : "Removed from starred",
+        description: `"${file.name}" has been ${starred ? "added to" : "removed from"} starred items.`,
+      });
+      
+      // Refresh data
+      queryClient.invalidateQueries({ queryKey: ['items'] });
+    } catch (error) {
+      console.error("Star error:", error);
+      toast({
+        variant: "destructive",
+        title: "Action failed",
+        description: `Failed to ${starred ? "star" : "unstar"} the item.`,
+      });
     }
   };
   
-  const handleBreadcrumbNavigate = (item: BreadcrumbItem | null) => {
-    if (item === null) {
-      // Navigate to root
-      setBreadcrumbs([]);
-      setFiles(generateMockFiles());
-    } else {
-      // Navigate to specific breadcrumb
-      const index = breadcrumbs.findIndex(crumb => crumb.id === item.id);
-      if (index >= 0) {
-        setBreadcrumbs(breadcrumbs.slice(0, index + 1));
-        // In a real app, load the appropriate folder content
-        // For demo, we'll just show fewer files when navigating deeper
-        const mockSubfolderFiles = generateMockFiles().slice(0, 4 + index);
-        setFiles(mockSubfolderFiles);
-      }
-    }
-  };
-  
-  const handleStarClick = (file: FileItem, starred: boolean) => {
-    setFiles(files.map(f => 
-      f.id === file.id ? { ...f, starred } : f
-    ));
-    
-    toast({
-      title: starred ? "Added to starred" : "Removed from starred",
-      description: `"${file.name}" has been ${starred ? "added to" : "removed from"} starred items.`,
-    });
-  };
-  
+  // Handle share
   const handleShareClick = (file: FileItem) => {
     setShareFile(file);
   };
   
-  const handleDownloadClick = (file: FileItem) => {
-    toast({
-      title: "Download started",
-      description: `Downloading "${file.name}"...`,
-    });
+  // Handle download
+  const handleDownloadClick = async (file: FileItem) => {
+    try {
+      toast({
+        title: "Download started",
+        description: `Downloading "${file.name}"...`,
+      });
+      
+      const { url, fileName } = await downloadFile(file.id);
+      
+      // Create a temporary anchor element and simulate click
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      
+      toast({
+        title: "Download complete",
+        description: `"${file.name}" has been downloaded.`,
+      });
+    } catch (error) {
+      console.error("Download error:", error);
+      toast({
+        variant: "destructive",
+        title: "Download failed",
+        description: "Failed to download the file. Please try again.",
+      });
+    }
   };
   
-  const handleDeleteClick = (file: FileItem) => {
-    setFiles(files.filter(f => f.id !== file.id));
-    
-    toast({
-      title: "Moved to trash",
-      description: `"${file.name}" has been moved to trash.`,
-    });
+  // Handle delete/trash
+  const handleDeleteClick = async (file: FileItem) => {
+    try {
+      if (view === 'trash') {
+        // Permanent delete from trash
+        await deleteItemPermanently(file);
+        toast({
+          title: "Deleted permanently",
+          description: `"${file.name}" has been permanently deleted.`,
+        });
+      } else {
+        // Move to trash
+        await trashItem(file);
+        toast({
+          title: "Moved to trash",
+          description: `"${file.name}" has been moved to trash.`,
+        });
+      }
+      
+      // Refresh data
+      queryClient.invalidateQueries({ queryKey: ['items'] });
+      queryClient.invalidateQueries({ queryKey: ['storage-stats'] });
+    } catch (error) {
+      console.error("Delete error:", error);
+      toast({
+        variant: "destructive",
+        title: "Delete failed",
+        description: "Failed to delete the item. Please try again.",
+      });
+    }
   };
+  
+  // Handle restore from trash
+  const handleRestoreClick = async (file: FileItem) => {
+    try {
+      await restoreItem(file);
+      
+      toast({
+        title: "Item restored",
+        description: `"${file.name}" has been restored.`,
+      });
+      
+      // Refresh data
+      queryClient.invalidateQueries({ queryKey: ['items'] });
+    } catch (error) {
+      console.error("Restore error:", error);
+      toast({
+        variant: "destructive",
+        title: "Restore failed",
+        description: "Failed to restore the item. Please try again.",
+      });
+    }
+  };
+  
+  // Handle search results
+  const handleSearch = (results: { files: FileItem[], folders: FileItem[] }) => {
+    setSearchResults([...results.folders, ...results.files]);
+  };
+  
+  // Display items - either search results or regular items
+  const displayItems = searchResults || items;
   
   return (
-    <AppLayout>
+    <AppLayout onSearch={handleSearch}>
       <div className="space-y-4">
-        <BreadcrumbNav items={breadcrumbs} onNavigate={handleBreadcrumbNavigate} />
+        {!searchResults && (
+          <BreadcrumbNav 
+            items={breadcrumbs} 
+            onNavigate={handleBreadcrumbNavigate}
+            isLoading={breadcrumbsLoading} 
+          />
+        )}
+        
+        {searchResults && (
+          <div className="flex justify-between items-center">
+            <h2 className="text-lg font-medium">Search Results ({searchResults.length})</h2>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => setSearchResults(null)}
+            >
+              Clear Search
+            </Button>
+          </div>
+        )}
         
         <FileActions
           onUploadClick={handleUploadClick}
           onCreateFolder={handleCreateFolder}
           viewMode={viewMode}
           onViewModeChange={setViewMode}
+          showRestoreAll={view === 'trash' && displayItems.length > 0}
+          onRestoreAll={async () => {
+            try {
+              await Promise.all(displayItems.map(item => restoreItem(item)));
+              toast({
+                title: "Items restored",
+                description: "All items have been restored from trash.",
+              });
+              refetchItems();
+            } catch (error) {
+              console.error("Restore all error:", error);
+              toast({
+                variant: "destructive",
+                title: "Restore failed",
+                description: "Failed to restore items. Please try again.",
+              });
+            }
+          }}
         />
         
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           <div className="lg:col-span-3">
-            {files.length > 0 ? (
+            {itemsError ? (
+              <div className="bg-muted/30 border border-dashed rounded-lg p-12 flex flex-col items-center justify-center">
+                <h3 className="text-xl font-medium mb-2">Error loading files</h3>
+                <p className="text-muted-foreground text-center mb-4">
+                  There was a problem loading your files. Please try again.
+                </p>
+                <Button onClick={() => refetchItems()}>Retry</Button>
+              </div>
+            ) : itemsLoading ? (
+              <div className="bg-muted/30 border border-dashed rounded-lg p-12 flex flex-col items-center justify-center">
+                <h3 className="text-xl font-medium mb-2">Loading files...</h3>
+              </div>
+            ) : displayItems.length > 0 ? (
               <FileGrid
-                files={files}
+                files={displayItems}
                 onItemClick={handleItemClick}
                 onShareClick={handleShareClick}
                 onDeleteClick={handleDeleteClick}
                 onStarClick={handleStarClick}
                 onDownloadClick={handleDownloadClick}
+                onRestoreClick={handleRestoreClick}
                 viewMode={viewMode}
+                isTrashView={view === 'trash'}
               />
             ) : (
               <div className="bg-muted/30 border border-dashed rounded-lg p-12 flex flex-col items-center justify-center">
-                <h3 className="text-xl font-medium mb-2">This folder is empty</h3>
+                <h3 className="text-xl font-medium mb-2">
+                  {searchResults
+                    ? "No search results found"
+                    : view === 'trash'
+                    ? "Trash is empty"
+                    : view === 'starred'
+                    ? "No starred items"
+                    : view === 'shared'
+                    ? "No shared items"
+                    : view === 'recent'
+                    ? "No recent items"
+                    : "This folder is empty"}
+                </h3>
                 <p className="text-muted-foreground text-center mb-4">
-                  Upload files or create folders to start organizing your content
+                  {searchResults
+                    ? "Try a different search term"
+                    : view === 'trash' || view === 'starred' || view === 'shared' || view === 'recent'
+                    ? ""
+                    : "Upload files or create folders to start organizing your content"}
                 </p>
-                <div className="flex gap-3">
-                  <Button onClick={handleUploadClick}>Upload Files</Button>
-                  <Button variant="outline" onClick={() => handleCreateFolder("New Folder")}>
-                    Create Folder
-                  </Button>
-                </div>
+                {!searchResults && view === 'all' && (
+                  <div className="flex gap-3">
+                    <Button onClick={() => document.getElementById('file-upload')?.click()}>Upload Files</Button>
+                    <Button variant="outline" onClick={() => handleCreateFolder("New Folder")}>
+                      Create Folder
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
           </div>
           
           <div>
             <StorageStats
-              usedStorage={usedStorage}
-              totalStorage={totalStorage}
-              breakdown={storageBreakdown}
+              usedStorage={storageData?.usedStorage || 0}
+              totalStorage={storageData?.totalStorage || 15 * 1024 * 1024 * 1024}
+              breakdown={storageData?.breakdown || []}
+              isLoading={storageLoading}
               className="sticky top-6"
             />
           </div>
         </div>
       </div>
       
-      <ShareModal file={shareFile} onClose={() => setShareFile(null)} />
+      {shareFile && (
+        <ShareModal 
+          file={shareFile} 
+          onClose={() => setShareFile(null)}
+          onShare={async (email, accessLevel, expiresIn) => {
+            try {
+              const expiryDate = expiresIn === 'never' 
+                ? null 
+                : new Date(Date.now() + parseInt(expiresIn) * 24 * 60 * 60 * 1000);
+                
+              await shareFile(shareFile.id, email, accessLevel as 'view' | 'edit', expiryDate);
+              
+              toast({
+                title: "File shared",
+                description: `"${shareFile.name}" has been shared with ${email}.`,
+              });
+              
+              setShareFile(null);
+              queryClient.invalidateQueries({ queryKey: ['items'] });
+            } catch (error) {
+              console.error("Share error:", error);
+              toast({
+                variant: "destructive",
+                title: "Share failed",
+                description: "Failed to share the file. Please try again.",
+              });
+            }
+          }}
+        />
+      )}
+      
+      {/* Hidden file input for uploads */}
+      <input
+        id="file-upload"
+        type="file"
+        multiple
+        onChange={(e) => handleUploadClick(e.target.files)}
+        className="hidden"
+      />
     </AppLayout>
   );
 };
