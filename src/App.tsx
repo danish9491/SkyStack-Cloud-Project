@@ -10,6 +10,9 @@ import AuthGuard from "@/components/auth/AuthGuard";
 import Landing from "./pages/Landing";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
+import Profile from "./pages/Profile";
+import Settings from "./pages/Settings";
+import Security from "./pages/Security";
 import NotFound from "./pages/NotFound";
 
 // Create a client
@@ -36,6 +39,9 @@ const App = () => {
                   <Route path="/shared" element={<Dashboard />} />
                   <Route path="/trash" element={<Dashboard />} />
                   <Route path="/folder/:folderId" element={<Dashboard />} />
+                  <Route path="/profile" element={<Profile />} />
+                  <Route path="/settings" element={<Settings />} />
+                  <Route path="/security" element={<Security />} />
                 </Route>
 
                 <Route path="*" element={<NotFound />} />

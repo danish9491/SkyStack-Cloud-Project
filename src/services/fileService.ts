@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { FileItem } from "@/components/files/FileGrid";
 import { Database } from "@/integrations/supabase/types";
@@ -205,36 +204,29 @@ export async function deleteItemPermanently(item: FileItem) {
   }
 }
 
-export async function shareFile(fileId: string, email: string, accessLevel: 'view' | 'edit', expiresAt: Date | null = null) {
+export const shareFile = async (fileId: string, sharedWith: string | null = null, accessLevel: string = 'view', expiresAt: Date | null = null) => {
   try {
-    const user = supabase.auth.getUser();
-    if (!user) throw new Error("User not authenticated");
+    const { data: user } = await supabase.auth.getUser();
+    if (!user.user) throw new Error("User not authenticated");
 
     const { data, error } = await supabase
       .from('shared_files')
       .insert({
         file_id: fileId,
-        shared_with: email,
-        shared_by: (await user).data.user?.id,
+        shared_by: user.user.id,
+        shared_with: sharedWith,
         access_level: accessLevel,
-        expires_at: expiresAt
-      })
-      .select();
-    
+        expires_at: expiresAt ? expiresAt.toISOString() : null
+      });
+
     if (error) throw error;
-    
-    // Update the file to mark it as shared
-    await supabase
-      .from('files')
-      .update({ shared: true })
-      .eq('id', fileId);
-    
-    return data;
+
+    return { success: true, shareId: data?.[0]?.id || null };
   } catch (error) {
-    console.error("Error sharing file:", error);
-    throw error;
+    console.error('Error sharing file:', error);
+    return { success: false, error };
   }
-}
+};
 
 export async function uploadFile(file: File, parentFolderId: string | null = null) {
   try {
