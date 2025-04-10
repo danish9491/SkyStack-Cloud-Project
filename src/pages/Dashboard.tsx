@@ -119,15 +119,23 @@ const Dashboard: React.FC = () => {
   
   const handleCreateFolder = useCallback(async (name: string) => {
     try {
-      await createFolder(name, folderId || null);
+      const result = await createFolder(name, folderId || null);
       
-      toast({
-        title: "Folder created",
-        description: `"${name}" folder has been created.`,
-      });
-      
-      queryClient.invalidateQueries({ queryKey: ['items'] });
-      setIsNewFolderModalOpen(false);
+      if (result.success) {
+        toast({
+          title: "Folder created",
+          description: `"${name}" folder has been created.`,
+        });
+        
+        queryClient.invalidateQueries({ queryKey: ['items'] });
+        setIsNewFolderModalOpen(false);
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Failed to create folder",
+          description: result.error || "An error occurred while creating the folder.",
+        });
+      }
     } catch (error) {
       console.error("Create folder error:", error);
       toast({

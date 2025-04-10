@@ -37,22 +37,25 @@ const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
       try {
         setIsLoading(true);
         
-        // For local mock service, we'll use the direct file path
-        if (file.filePath) {
-          // Handle actual Supabase storage paths
-          // Get file URL from storage
-          const { data, error } = await supabase.storage
-            .from('files')
-            .createSignedUrl(file.filePath, 60 * 5); // 5 minutes expiry
-          
-          if (error) throw error;
-          
-          if (data?.signedUrl) {
-            setPreviewUrl(data.signedUrl);
+        // For mock service, we'll use a mock URL
+        // In real application with Supabase, we would use createSignedUrl
+        if (file.type === 'file') {
+          // Mock preview URLs based on file type
+          if (file.fileType?.includes('image')) {
+            setPreviewUrl('https://source.unsplash.com/random/800x600/?document');
+          } else if (file.fileType?.includes('video')) {
+            setPreviewUrl('https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4');
+          } else if (file.fileType?.includes('audio')) {
+            setPreviewUrl('https://sample-videos.com/audio/mp3/crowd-cheering.mp3');
+          } else if (file.fileType?.includes('pdf')) {
+            setPreviewUrl('https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf');
+          } else {
+            // For text and other files
+            setPreviewUrl('https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf');
           }
         } else {
-          // If we're using mock service, set a mock URL based on file type
-          setPreviewUrl(`/mock-preview/${file.id}`);
+          // If it's a folder, there's no preview
+          setPreviewUrl(null);
         }
       } catch (error) {
         console.error('Error getting preview URL:', error);
