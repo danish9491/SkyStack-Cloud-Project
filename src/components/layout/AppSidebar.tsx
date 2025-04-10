@@ -85,7 +85,7 @@ const AppSidebar = () => {
           <div className="bg-aigility-purple rounded-md p-1">
             <HardDrive className="h-6 w-6 text-white" />
           </div>
-          <h1 className="text-xl font-bold">Aigility Vault</h1>
+          <h1 className="text-xl font-bold">SkyStack Vault</h1>
         </Link>
       </SidebarHeader>
       

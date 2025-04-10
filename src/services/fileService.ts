@@ -1,461 +1,406 @@
 
-import { supabase } from "@/integrations/supabase/client";
-import { FileItem } from "@/components/files/FileGrid";
-import { Database } from "@/integrations/supabase/types";
+// Mock data and services for the file management system
+import { v4 as uuidv4 } from 'uuid';
+import { useToast } from '@/components/ui/use-toast';
 
-export async function fetchFiles(folderId: string | null = null, view: 'all' | 'starred' | 'shared' | 'trash' | 'recent' = 'all') {
+// Types
+export type FileItem = {
+  id: string;
+  name: string;
+  type: 'file' | 'folder';
+  fileType?: string;
+  size?: number;
+  createdAt: string;
+  updatedAt: string;
+  starred?: boolean;
+  shared?: boolean;
+  filePath?: string;
+  parentFolderId?: string | null;
+};
+
+export type FolderPath = {
+  id: string;
+  name: string;
+};
+
+export type FileUploadResponse = {
+  success: boolean;
+  file?: FileItem;
+  error?: string;
+};
+
+export type FolderCreateResponse = {
+  success: boolean;
+  folder?: FileItem;
+  error?: string;
+};
+
+export type FileSearchResponse = {
+  files: FileItem[];
+  folders: FileItem[];
+};
+
+export type StorageStats = {
+  usedStorage: number; // in bytes
+  totalStorage: number; // in bytes
+  fileCount: number;
+  folderCount: number;
+};
+
+// Mock storage for files and folders
+let mockFiles: FileItem[] = [
+  {
+    id: '1',
+    name: 'Project Proposal.docx',
+    type: 'file',
+    fileType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    size: 2500000, // 2.5 MB
+    createdAt: '2023-01-15T10:30:00Z',
+    updatedAt: '2023-01-15T10:30:00Z',
+    starred: false,
+    shared: false,
+    filePath: '/root/documents/Project Proposal.docx',
+    parentFolderId: '101',
+  },
+  {
+    id: '2',
+    name: 'Budget 2023.xlsx',
+    type: 'file',
+    fileType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    size: 1800000, // 1.8 MB
+    createdAt: '2023-01-10T08:45:00Z',
+    updatedAt: '2023-01-12T14:20:00Z',
+    starred: true,
+    shared: true,
+    filePath: '/root/documents/Budget 2023.xlsx',
+    parentFolderId: '101',
+  },
+  {
+    id: '3',
+    name: 'Team Photo.jpg',
+    type: 'file',
+    fileType: 'image/jpeg',
+    size: 4200000, // 4.2 MB
+    createdAt: '2022-12-25T16:00:00Z',
+    updatedAt: '2022-12-25T16:00:00Z',
+    starred: true,
+    shared: false,
+    filePath: '/root/photos/Team Photo.jpg',
+    parentFolderId: '102',
+  },
+  {
+    id: '4',
+    name: 'Product Demo.mp4',
+    type: 'file',
+    fileType: 'video/mp4',
+    size: 58000000, // 58 MB
+    createdAt: '2023-01-05T11:15:00Z',
+    updatedAt: '2023-01-05T11:15:00Z',
+    starred: false,
+    shared: true,
+    filePath: '/root/videos/Product Demo.mp4',
+    parentFolderId: '103',
+  },
+  {
+    id: '5',
+    name: 'Meeting Notes.txt',
+    type: 'file',
+    fileType: 'text/plain',
+    size: 25000, // 25 KB
+    createdAt: '2023-01-18T09:00:00Z',
+    updatedAt: '2023-01-18T15:30:00Z',
+    starred: false,
+    shared: false,
+    filePath: '/root/Meeting Notes.txt',
+    parentFolderId: null,
+  },
+];
+
+let mockFolders: FileItem[] = [
+  {
+    id: '101',
+    name: 'Documents',
+    type: 'folder',
+    createdAt: '2022-12-01T10:00:00Z',
+    updatedAt: '2023-01-15T10:30:00Z',
+    starred: false,
+    shared: false,
+    parentFolderId: null,
+  },
+  {
+    id: '102',
+    name: 'Photos',
+    type: 'folder',
+    createdAt: '2022-12-01T10:05:00Z',
+    updatedAt: '2022-12-25T16:00:00Z',
+    starred: false,
+    shared: false,
+    parentFolderId: null,
+  },
+  {
+    id: '103',
+    name: 'Videos',
+    type: 'folder',
+    createdAt: '2022-12-01T10:10:00Z',
+    updatedAt: '2023-01-05T11:15:00Z',
+    starred: false,
+    shared: false,
+    parentFolderId: null,
+  },
+];
+
+// Helper function to simulate API delay
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Get all files and folders in the root or specific folder
+export const getFiles = async (folderId: string | null = null): Promise<FileItem[]> => {
+  await delay(800);
+  
+  const folderFiles = mockFiles.filter(file => file.parentFolderId === folderId);
+  const folders = mockFolders.filter(folder => folder.parentFolderId === folderId);
+  
+  return [...folders, ...folderFiles];
+};
+
+// Get a specific file or folder by ID
+export const getFileById = async (fileId: string): Promise<FileItem | null> => {
+  await delay(500);
+  
+  const file = mockFiles.find(f => f.id === fileId);
+  if (file) return file;
+  
+  const folder = mockFolders.find(f => f.id === fileId);
+  if (folder) return folder;
+  
+  return null;
+};
+
+// Get recent files
+export const getRecentFiles = async (): Promise<FileItem[]> => {
+  await delay(800);
+  
+  // Sort files by updatedAt date and take the most recent ones
+  return [...mockFiles]
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+    .slice(0, 10);
+};
+
+// Get starred files and folders
+export const getStarredItems = async (): Promise<FileItem[]> => {
+  await delay(800);
+  
+  const starredFiles = mockFiles.filter(file => file.starred);
+  const starredFolders = mockFolders.filter(folder => folder.starred);
+  
+  return [...starredFolders, ...starredFiles];
+};
+
+// Get shared files and folders
+export const getSharedItems = async (): Promise<FileItem[]> => {
+  await delay(800);
+  
+  const sharedFiles = mockFiles.filter(file => file.shared);
+  const sharedFolders = mockFolders.filter(folder => folder.shared);
+  
+  return [...sharedFolders, ...sharedFiles];
+};
+
+// Get folder breadcrumb path
+export const getFolderPath = async (folderId: string): Promise<FolderPath[]> => {
+  await delay(500);
+  
+  // This is a simplified implementation
+  // In a real app, you would traverse up the folder tree
+  const folder = mockFolders.find(f => f.id === folderId);
+  if (!folder) return [];
+  
+  return [
+    { id: 'root', name: 'My Drive' },
+    { id: folder.id, name: folder.name },
+  ];
+};
+
+// Upload a file
+export const uploadFile = async (file: File, folderId: string | null = null): Promise<FileUploadResponse> => {
+  await delay(1500);
+  
   try {
-    let query = supabase.from('files')
-      .select('*');
+    // Create a new file object
+    const newFile: FileItem = {
+      id: uuidv4(),
+      name: file.name,
+      type: 'file',
+      fileType: file.type,
+      size: file.size,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      starred: false,
+      shared: false,
+      parentFolderId: folderId,
+    };
     
-    // Add filters based on view
-    if (view === 'starred') {
-      query = query.eq('is_starred', true).eq('is_trashed', false);
-    } else if (view === 'shared') {
-      query = query.eq('shared', true).eq('is_trashed', false);
-    } else if (view === 'trash') {
-      query = query.eq('is_trashed', true);
-    } else if (view === 'recent') {
-      query = query.eq('is_trashed', false).order('updated_at', { ascending: false }).limit(10);
-    } else if (view === 'all') {
-      // If in a specific folder
-      if (folderId) {
-        query = query.eq('parent_folder_id', folderId).eq('is_trashed', false);
-      } else {
-        // Root folder (null parent)
-        query = query.is('parent_folder_id', null).eq('is_trashed', false);
-      }
-    }
+    mockFiles.push(newFile);
     
-    const { data, error } = await query;
-    
-    if (error) throw error;
-    
-    return data ? transformFilesData(data) : [];
+    return {
+      success: true,
+      file: newFile,
+    };
   } catch (error) {
-    console.error("Error fetching files:", error);
-    return [];
-  }
-}
-
-export async function fetchFolders(parentFolderId: string | null = null, view: 'all' | 'starred' | 'shared' | 'trash' | 'recent' = 'all') {
-  try {
-    let query = supabase.from('folders')
-      .select('*');
-    
-    // Add filters based on view
-    if (view === 'starred') {
-      query = query.eq('is_starred', true).eq('is_trashed', false);
-    } else if (view === 'shared') {
-      query = query.eq('shared', true).eq('is_trashed', false);
-    } else if (view === 'trash') {
-      query = query.eq('is_trashed', true);
-    } else if (view === 'recent') {
-      query = query.eq('is_trashed', false).order('updated_at', { ascending: false }).limit(10);
-    } else if (view === 'all') {
-      // If in a specific folder
-      if (parentFolderId) {
-        query = query.eq('parent_folder_id', parentFolderId).eq('is_trashed', false);
-      } else {
-        // Root folder (null parent)
-        query = query.is('parent_folder_id', null).eq('is_trashed', false);
-      }
-    }
-    
-    const { data, error } = await query;
-    
-    if (error) throw error;
-    
-    return data ? transformFoldersData(data) : [];
-  } catch (error) {
-    console.error("Error fetching folders:", error);
-    return [];
-  }
-}
-
-export async function fetchAllItems(folderId: string | null = null, view: 'all' | 'starred' | 'shared' | 'trash' | 'recent' = 'all') {
-  const files = await fetchFiles(folderId, view);
-  const folders = await fetchFolders(folderId, view);
-  return [...folders, ...files];
-}
-
-export async function createFolder(name: string, parentFolderId: string | null = null) {
-  try {
-    const { data: userData, error: userError } = await supabase.auth.getUser();
-    if (userError || !userData.user) throw new Error("User not authenticated");
-
-    const { data, error } = await supabase
-      .from('folders')
-      .insert({
-        name,
-        parent_folder_id: parentFolderId,
-        user_id: userData.user.id
-      })
-      .select()
-      .single();
-    
-    if (error) throw error;
-    
-    return transformFolderData(data);
-  } catch (error) {
-    console.error("Error creating folder:", error);
-    throw error;
-  }
-}
-
-export async function starItem(item: FileItem, starred: boolean) {
-  try {
-    if (item.type === 'folder') {
-      const { error } = await supabase
-        .from('folders')
-        .update({ is_starred: starred })
-        .eq('id', item.id);
-      
-      if (error) throw error;
-    } else {
-      const { error } = await supabase
-        .from('files')
-        .update({ is_starred: starred })
-        .eq('id', item.id);
-      
-      if (error) throw error;
-    }
-  } catch (error) {
-    console.error("Error starring item:", error);
-    throw error;
-  }
-}
-
-export async function trashItem(item: FileItem) {
-  try {
-    if (item.type === 'folder') {
-      const { error } = await supabase
-        .from('folders')
-        .update({ is_trashed: true })
-        .eq('id', item.id);
-      
-      if (error) throw error;
-    } else {
-      const { error } = await supabase
-        .from('files')
-        .update({ is_trashed: true })
-        .eq('id', item.id);
-      
-      if (error) throw error;
-    }
-  } catch (error) {
-    console.error("Error trashing item:", error);
-    throw error;
-  }
-}
-
-export async function restoreItem(item: FileItem) {
-  try {
-    if (item.type === 'folder') {
-      const { error } = await supabase
-        .from('folders')
-        .update({ is_trashed: false })
-        .eq('id', item.id);
-      
-      if (error) throw error;
-    } else {
-      const { error } = await supabase
-        .from('files')
-        .update({ is_trashed: false })
-        .eq('id', item.id);
-      
-      if (error) throw error;
-    }
-  } catch (error) {
-    console.error("Error restoring item:", error);
-    throw error;
-  }
-}
-
-export async function deleteItemPermanently(item: FileItem) {
-  try {
-    if (item.type === 'folder') {
-      const { error } = await supabase
-        .from('folders')
-        .delete()
-        .eq('id', item.id);
-      
-      if (error) throw error;
-    } else {
-      // First delete the file from storage
-      if (item.filePath) {
-        const { error: storageError } = await supabase.storage
-          .from('files')
-          .remove([item.filePath]);
-        
-        if (storageError) throw storageError;
-      }
-      
-      // Then delete the file record
-      const { error } = await supabase
-        .from('files')
-        .delete()
-        .eq('id', item.id);
-      
-      if (error) throw error;
-    }
-  } catch (error) {
-    console.error("Error deleting item:", error);
-    throw error;
-  }
-}
-
-export const shareFile = async (fileId: string, sharedWith: string | null = null, accessLevel: string = 'view', expiresAt: Date | null = null) => {
-  try {
-    const { data: userData, error: userError } = await supabase.auth.getUser();
-    if (userError || !userData.user) throw new Error("User not authenticated");
-
-    const { data, error } = await supabase
-      .from('shared_files')
-      .insert({
-        file_id: fileId,
-        shared_by: userData.user.id,
-        shared_with: sharedWith,
-        access_level: accessLevel,
-        expires_at: expiresAt ? expiresAt.toISOString() : null
-      });
-
-    if (error) throw error;
-
-    // Safely access data - fix for the TypeScript error
-    return { success: true, shareId: data && data[0] ? data[0].id : null };
-  } catch (error) {
-    console.error('Error sharing file:', error);
-    return { success: false, error };
+    console.error('Error uploading file:', error);
+    return {
+      success: false,
+      error: 'Failed to upload file. Please try again.',
+    };
   }
 };
 
-export async function uploadFile(file: File, parentFolderId: string | null = null) {
-  try {
-    // Generate a unique file path to avoid collisions
-    const filePath = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
-    
-    // Upload the file to storage
-    const { data: storageData, error: storageError } = await supabase.storage
-      .from('files')
-      .upload(filePath, file);
-    
-    if (storageError) throw storageError;
-
-    // Get current user
-    const user = supabase.auth.getUser();
-    if (!user) throw new Error("User not authenticated");
-    
-    // Create a record in the files table
-    const { data, error } = await supabase
-      .from('files')
-      .insert({
-        name: file.name,
-        file_path: filePath,
-        file_type: file.type,
-        size: file.size,
-        parent_folder_id: parentFolderId,
-        user_id: (await user).data.user?.id
-      })
-      .select()
-      .single();
-    
-    if (error) throw error;
-    
-    return transformFileData(data);
-  } catch (error) {
-    console.error("Error uploading file:", error);
-    throw error;
-  }
-}
-
-export async function downloadFile(fileId: string) {
-  try {
-    // Get file path from database
-    const { data: fileData, error: fileError } = await supabase
-      .from('files')
-      .select('file_path, name')
-      .eq('id', fileId)
-      .single();
-    
-    if (fileError || !fileData) throw fileError || new Error("File not found");
-    
-    // Get download URL
-    const { data, error } = await supabase.storage
-      .from('files')
-      .download(fileData.file_path);
-    
-    if (error) throw error;
-    
-    return { url: URL.createObjectURL(data), fileName: fileData.name };
-  } catch (error) {
-    console.error("Error downloading file:", error);
-    throw error;
-  }
-}
-
-export async function getBreadcrumbPath(folderId: string | null) {
-  if (!folderId) return [];
+// Create a new folder
+export const createFolder = async (name: string, parentFolderId: string | null = null): Promise<FolderCreateResponse> => {
+  await delay(1000);
   
   try {
-    const breadcrumbs = [];
-    let currentFolderId = folderId;
+    // Check if a folder with the same name exists in the same location
+    const folderExists = mockFolders.some(
+      f => f.name === name && f.parentFolderId === parentFolderId
+    );
     
-    while (currentFolderId) {
-      const { data, error } = await supabase
-        .from('folders')
-        .select('id, name, parent_folder_id')
-        .eq('id', currentFolderId)
-        .single();
-      
-      if (error || !data) break;
-      
-      breadcrumbs.unshift({ 
-        id: data.id, 
-        name: data.name 
-      });
-      
-      currentFolderId = data.parent_folder_id;
+    if (folderExists) {
+      return {
+        success: false,
+        error: 'A folder with this name already exists.',
+      };
     }
     
-    return breadcrumbs;
-  } catch (error) {
-    console.error("Error fetching breadcrumb path:", error);
-    return [];
-  }
-}
-
-export async function getStorageStats() {
-  try {
-    const { data: files, error } = await supabase
-      .from('files')
-      .select('size, file_type')
-      .eq('is_trashed', false);
-    
-    if (error) throw error;
-    
-    let totalSize = 0;
-    const typeBreakdown = {
-      documents: 0,
-      images: 0,
-      videos: 0,
-      other: 0,
+    // Create new folder
+    const newFolder: FileItem = {
+      id: uuidv4(),
+      name,
+      type: 'folder',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      starred: false,
+      shared: false,
+      parentFolderId,
     };
     
-    if (files) {
-      files.forEach(file => {
-        const size = file.size || 0;
-        totalSize += size;
-        
-        const fileType = file.file_type || '';
-        if (fileType.includes('image')) {
-          typeBreakdown.images += size;
-        } else if (fileType.includes('video')) {
-          typeBreakdown.videos += size;
-        } else if (
-          fileType.includes('pdf') ||
-          fileType.includes('doc') ||
-          fileType.includes('sheet') ||
-          fileType.includes('text') ||
-          fileType.includes('presentation')
-        ) {
-          typeBreakdown.documents += size;
-        } else {
-          typeBreakdown.other += size;
-        }
-      });
-    }
+    mockFolders.push(newFolder);
     
     return {
-      usedStorage: totalSize,
-      totalStorage: 15 * 1024 * 1024 * 1024, // 15 GB
-      breakdown: [
-        { label: "Documents", size: typeBreakdown.documents, color: "#8B5CF6" },
-        { label: "Images", size: typeBreakdown.images, color: "#3B82F6" },
-        { label: "Videos", size: typeBreakdown.videos, color: "#10B981" },
-        { label: "Other", size: typeBreakdown.other, color: "#F59E0B" },
-      ],
+      success: true,
+      folder: newFolder,
     };
   } catch (error) {
-    console.error("Error getting storage stats:", error);
-    
-    // Return default stats on error
+    console.error('Error creating folder:', error);
     return {
-      usedStorage: 0,
-      totalStorage: 15 * 1024 * 1024 * 1024, // 15 GB
-      breakdown: [
-        { label: "Documents", size: 0, color: "#8B5CF6" },
-        { label: "Images", size: 0, color: "#3B82F6" },
-        { label: "Videos", size: 0, color: "#10B981" },
-        { label: "Other", size: 0, color: "#F59E0B" },
-      ],
+      success: false,
+      error: 'Failed to create folder. Please try again.',
     };
   }
-}
+};
 
-// Helper functions to transform database data to the FileItem format
-function transformFilesData(files: any[]): FileItem[] {
-  return files.map(transformFileData);
-}
-
-function transformFileData(file: any): FileItem {
-  return {
-    id: file.id,
-    name: file.name,
-    type: "file",
-    fileType: file.file_type,
-    size: file.size,
-    createdAt: file.created_at,
-    updatedAt: file.updated_at,
-    starred: file.is_starred,
-    shared: file.shared,
-    filePath: file.file_path,
-  };
-}
-
-function transformFoldersData(folders: any[]): FileItem[] {
-  return folders.map(transformFolderData);
-}
-
-function transformFolderData(folder: any): FileItem {
-  return {
-    id: folder.id,
-    name: folder.name,
-    type: "folder",
-    createdAt: folder.created_at,
-    updatedAt: folder.updated_at,
-    starred: folder.is_starred,
-    shared: folder.shared,
-    parentFolderId: folder.parent_folder_id,
-  };
-}
-
-export async function searchFiles(searchTerm: string) {
-  try {
-    // Search in files
-    const { data: files, error: filesError } = await supabase
-      .from('files')
-      .select('*')
-      .ilike('name', `%${searchTerm}%`)
-      .eq('is_trashed', false);
-    
-    if (filesError) throw filesError;
-    
-    // Search in folders
-    const { data: folders, error: foldersError } = await supabase
-      .from('folders')
-      .select('*')
-      .ilike('name', `%${searchTerm}%`)
-      .eq('is_trashed', false);
-    
-    if (foldersError) throw foldersError;
-    
-    return {
-      files: files ? transformFilesData(files) : [],
-      folders: folders ? transformFoldersData(folders) : [],
-    };
-  } catch (error) {
-    console.error("Error searching files:", error);
+// Search for files and folders
+export const searchFiles = async (query: string): Promise<FileSearchResponse> => {
+  await delay(1000);
+  
+  const normalizedQuery = query.toLowerCase().trim();
+  
+  if (!normalizedQuery) {
     return { files: [], folders: [] };
   }
-}
+  
+  const matchedFiles = mockFiles.filter(
+    file => file.name.toLowerCase().includes(normalizedQuery)
+  );
+  
+  const matchedFolders = mockFolders.filter(
+    folder => folder.name.toLowerCase().includes(normalizedQuery)
+  );
+  
+  return {
+    files: matchedFiles,
+    folders: matchedFolders,
+  };
+};
+
+// Delete a file or folder
+export const deleteItem = async (item: FileItem): Promise<boolean> => {
+  await delay(800);
+  
+  try {
+    if (item.type === 'file') {
+      mockFiles = mockFiles.filter(f => f.id !== item.id);
+    } else {
+      mockFolders = mockFolders.filter(f => f.id !== item.id);
+      // Also delete all files and folders within this folder
+      // This is a simplified implementation
+      mockFiles = mockFiles.filter(f => f.parentFolderId !== item.id);
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Error deleting item:', error);
+    return false;
+  }
+};
+
+// Star or unstar a file or folder
+export const toggleStarred = async (item: FileItem, starred: boolean): Promise<boolean> => {
+  await delay(500);
+  
+  try {
+    if (item.type === 'file') {
+      const fileIndex = mockFiles.findIndex(f => f.id === item.id);
+      if (fileIndex !== -1) {
+        mockFiles[fileIndex].starred = starred;
+      }
+    } else {
+      const folderIndex = mockFolders.findIndex(f => f.id === item.id);
+      if (folderIndex !== -1) {
+        mockFolders[folderIndex].starred = starred;
+      }
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Error updating star status:', error);
+    return false;
+  }
+};
+
+// Share a file or folder
+export const shareItem = async (fileId: string, email: string, accessLevel: string, expiresIn: string): Promise<boolean> => {
+  await delay(1000);
+  
+  try {
+    const file = mockFiles.find(f => f.id === fileId);
+    if (file) {
+      file.shared = true;
+      return true;
+    }
+    
+    const folder = mockFolders.find(f => f.id === fileId);
+    if (folder) {
+      folder.shared = true;
+      return true;
+    }
+    
+    return false;
+  } catch (error) {
+    console.error('Error sharing item:', error);
+    return false;
+  }
+};
+
+// Get storage statistics
+export const getStorageStats = async (): Promise<StorageStats> => {
+  await delay(800);
+  
+  const usedStorage = mockFiles.reduce((total, file) => total + (file.size || 0), 0);
+  
+  return {
+    usedStorage,
+    totalStorage: 15 * 1024 * 1024 * 1024, // 15 GB
+    fileCount: mockFiles.length,
+    folderCount: mockFolders.length,
+  };
+};
