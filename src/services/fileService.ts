@@ -45,6 +45,7 @@ export type StorageStats = {
   totalStorage: number; // in bytes
   fileCount: number;
   folderCount: number;
+  breakdown?: Array<{ type: string; size: number; color: string }>;
 };
 
 // Mock storage for files and folders
@@ -152,6 +153,26 @@ let mockFolders: FileItem[] = [
 // Helper function to simulate API delay
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+// Alias functions to match the imports in Dashboard.tsx
+export const fetchAllItems = async (folderId: string | null = null, view: 'all' | 'starred' | 'shared' | 'trash' | 'recent' = 'all'): Promise<FileItem[]> => {
+  await delay(800);
+  
+  switch (view) {
+    case 'starred':
+      return getStarredItems();
+    case 'shared':
+      return getSharedItems();
+    case 'recent':
+      return getRecentFiles();
+    case 'trash':
+      // Mock implementation for trash items
+      return [];
+    case 'all':
+    default:
+      return getFiles(folderId);
+  }
+};
+
 // Get all files and folders in the root or specific folder
 export const getFiles = async (folderId: string | null = null): Promise<FileItem[]> => {
   await delay(800);
@@ -218,6 +239,12 @@ export const getFolderPath = async (folderId: string): Promise<FolderPath[]> => 
     { id: 'root', name: 'My Drive' },
     { id: folder.id, name: folder.name },
   ];
+};
+
+// Get breadcrumb path - alias for Dashboard.tsx
+export const getBreadcrumbPath = async (folderId: string | null): Promise<FolderPath[]> => {
+  if (!folderId) return [];
+  return getFolderPath(folderId);
 };
 
 // Upload a file
@@ -343,6 +370,16 @@ export const deleteItem = async (item: FileItem): Promise<boolean> => {
   }
 };
 
+// Alias for Dashboard.tsx
+export const trashItem = async (item: FileItem): Promise<boolean> => {
+  return deleteItem(item);
+};
+
+// Alias for Dashboard.tsx
+export const deleteItemPermanently = async (item: FileItem): Promise<boolean> => {
+  return deleteItem(item);
+};
+
 // Star or unstar a file or folder
 export const toggleStarred = async (item: FileItem, starred: boolean): Promise<boolean> => {
   await delay(500);
@@ -367,8 +404,13 @@ export const toggleStarred = async (item: FileItem, starred: boolean): Promise<b
   }
 };
 
+// Alias for Dashboard.tsx
+export const starItem = async (item: FileItem, starred: boolean): Promise<boolean> => {
+  return toggleStarred(item, starred);
+};
+
 // Share a file or folder
-export const shareItem = async (fileId: string, email: string, accessLevel: string, expiresIn: string): Promise<boolean> => {
+export const shareItem = async (fileId: string, email: string, accessLevel: string, expiryDate: Date | null = null): Promise<boolean> => {
   await delay(1000);
   
   try {
@@ -391,16 +433,52 @@ export const shareItem = async (fileId: string, email: string, accessLevel: stri
   }
 };
 
+// Alias for Dashboard.tsx
+export const shareFile = shareItem;
+
+// Mock download function for Dashboard.tsx
+export const downloadFile = async (fileId: string): Promise<{ url: string, fileName: string }> => {
+  await delay(1000);
+  
+  const file = mockFiles.find(f => f.id === fileId);
+  if (!file) {
+    throw new Error('File not found');
+  }
+  
+  // Create a fake download URL
+  const url = `data:${file.fileType || 'application/octet-stream'};base64,dGhpcyBpcyBhIG1vY2sgZmlsZSBjb250ZW50`;
+  
+  return {
+    url,
+    fileName: file.name
+  };
+};
+
+// Mock restore function for Dashboard.tsx
+export const restoreItem = async (file: FileItem): Promise<boolean> => {
+  await delay(800);
+  return true;
+};
+
 // Get storage statistics
 export const getStorageStats = async (): Promise<StorageStats> => {
   await delay(800);
   
   const usedStorage = mockFiles.reduce((total, file) => total + (file.size || 0), 0);
   
+  // Add a mock breakdown for storage stats
+  const breakdown = [
+    { type: 'Documents', size: 4300000, color: '#4285f4' },
+    { type: 'Images', size: 4200000, color: '#0f9d58' },
+    { type: 'Videos', size: 58000000, color: '#f4b400' },
+    { type: 'Others', size: 25000, color: '#db4437' }
+  ];
+  
   return {
     usedStorage,
     totalStorage: 15 * 1024 * 1024 * 1024, // 15 GB
     fileCount: mockFiles.length,
     folderCount: mockFolders.length,
+    breakdown
   };
 };
