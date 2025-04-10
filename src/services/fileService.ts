@@ -164,8 +164,7 @@ export const fetchAllItems = async (folderId: string | null = null, view: 'all' 
     case 'recent':
       return getRecentFiles();
     case 'trash':
-      // Mock implementation for trash items
-      return [];
+      return getTrashItems(); // Modified to use new trash function
     case 'all':
     default:
       return getFiles(folderId);
@@ -176,10 +175,20 @@ export const fetchAllItems = async (folderId: string | null = null, view: 'all' 
 export const getFiles = async (folderId: string | null = null): Promise<FileItem[]> => {
   await delay(800);
   
-  const folderFiles = mockFiles.filter(file => file.parentFolderId === folderId);
-  const folders = mockFolders.filter(folder => folder.parentFolderId === folderId);
+  const folderFiles = mockFiles.filter(file => file.parentFolderId === folderId && !file.starred !== true);
+  const folders = mockFolders.filter(folder => folder.parentFolderId === folderId && !folder.starred !== true);
   
   return [...folders, ...folderFiles];
+};
+
+// New function to get trash items
+export const getTrashItems = async (): Promise<FileItem[]> => {
+  await delay(800);
+  
+  const trashedFiles = mockFiles.filter(file => file.starred === true);
+  const trashedFolders = mockFolders.filter(folder => folder.starred === true);
+  
+  return [...trashedFolders, ...trashedFiles];
 };
 
 // Get a specific file or folder by ID
@@ -229,15 +238,32 @@ export const getSharedItems = async (): Promise<FileItem[]> => {
 export const getFolderPath = async (folderId: string): Promise<FolderPath[]> => {
   await delay(500);
   
-  // This is a simplified implementation
-  // In a real app, you would traverse up the folder tree
-  const folder = mockFolders.find(f => f.id === folderId);
-  if (!folder) return [];
+  const path: FolderPath[] = [];
+  let currentFolderId = folderId;
   
-  return [
-    { id: 'root', name: 'My Drive' },
-    { id: folder.id, name: folder.name },
-  ];
+  // Start with a default if nothing else is found
+  path.unshift({ id: 'root', name: 'My Drive' });
+  
+  // Get the initial folder
+  const folder = mockFolders.find(f => f.id === currentFolderId);
+  if (folder) {
+    path.push({ id: folder.id, name: folder.name });
+    
+    // Try to trace back parent folders if they exist
+    let parentId = folder.parentFolderId;
+    while (parentId) {
+      const parentFolder = mockFolders.find(f => f.id === parentId);
+      if (parentFolder) {
+        // Insert at beginning to maintain correct order
+        path.splice(1, 0, { id: parentFolder.id, name: parentFolder.name });
+        parentId = parentFolder.parentFolderId;
+      } else {
+        break;
+      }
+    }
+  }
+  
+  return path;
 };
 
 // Get breadcrumb path - alias for Dashboard.tsx
@@ -246,11 +272,24 @@ export const getBreadcrumbPath = async (folderId: string | null): Promise<Folder
   return getFolderPath(folderId);
 };
 
-// Upload a file
+// Upload a file - Fixed to properly handle folder uploads
 export const uploadFile = async (file: File, folderId: string | null = null): Promise<FileUploadResponse> => {
   await delay(1500);
   
   try {
+    console.log(`Uploading file to folder: ${folderId}`);
+    
+    // First check if the folder exists if folderId is provided
+    if (folderId) {
+      const folderExists = mockFolders.some(folder => folder.id === folderId);
+      if (!folderExists) {
+        return {
+          success: false,
+          error: `Folder with ID ${folderId} does not exist.`,
+        };
+      }
+    }
+    
     // Create a new file object
     const newFile: FileItem = {
       id: uuidv4(),
@@ -263,6 +302,7 @@ export const uploadFile = async (file: File, folderId: string | null = null): Pr
       starred: false,
       shared: false,
       parentFolderId: folderId,
+      filePath: `/mock-files/${uuidv4()}-${file.name}`,
     };
     
     mockFiles.push(newFile);
@@ -348,18 +388,32 @@ export const searchFiles = async (query: string): Promise<FileSearchResponse> =>
   };
 };
 
-// Delete a file or folder
+// Delete a file or folder - Modified to mark as starred instead of actually deleting for trash functionality
 export const deleteItem = async (item: FileItem): Promise<boolean> => {
   await delay(800);
   
   try {
     if (item.type === 'file') {
-      mockFiles = mockFiles.filter(f => f.id !== item.id);
+      const fileIndex = mockFiles.findIndex(f => f.id === item.id);
+      if (fileIndex !== -1) {
+        mockFiles[fileIndex].starred = true; // Mark as starred for trash
+      }
     } else {
-      mockFolders = mockFolders.filter(f => f.id !== item.id);
-      // Also delete all files and folders within this folder
-      // This is a simplified implementation
-      mockFiles = mockFiles.filter(f => f.parentFolderId !== item.id);
+      const folderIndex = mockFolders.findIndex(f => f.id === item.id);
+      if (folderIndex !== -1) {
+        mockFolders[folderIndex].starred = true; // Mark as starred for trash
+      }
+      // Also mark all files and folders within this folder
+      mockFiles.forEach(file => {
+        if (file.parentFolderId === item.id) {
+          file.starred = true;
+        }
+      });
+      mockFolders.forEach(folder => {
+        if (folder.parentFolderId === item.id) {
+          folder.starred = true;
+        }
+      });
     }
     
     return true;
@@ -369,13 +423,29 @@ export const deleteItem = async (item: FileItem): Promise<boolean> => {
   }
 };
 
-// Alias for Dashboard.tsx
-export const trashItem = async (item: FileItem): Promise<boolean> => {
-  return deleteItem(item);
+// Completely delete an item from trash
+export const deleteItemPermanently = async (item: FileItem): Promise<boolean> => {
+  await delay(800);
+  
+  try {
+    if (item.type === 'file') {
+      mockFiles = mockFiles.filter(f => f.id !== item.id);
+    } else {
+      mockFolders = mockFolders.filter(f => f.id !== item.id);
+      // Also delete all files and folders within this folder
+      mockFiles = mockFiles.filter(f => f.parentFolderId !== item.id);
+      mockFolders = mockFolders.filter(f => f.parentFolderId !== item.id);
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Error deleting item permanently:', error);
+    return false;
+  }
 };
 
 // Alias for Dashboard.tsx
-export const deleteItemPermanently = async (item: FileItem): Promise<boolean> => {
+export const trashItem = async (item: FileItem): Promise<boolean> => {
   return deleteItem(item);
 };
 
@@ -453,10 +523,39 @@ export const downloadFile = async (fileId: string): Promise<{ url: string, fileN
   };
 };
 
-// Mock restore function for Dashboard.tsx
+// Restore an item from trash
 export const restoreItem = async (file: FileItem): Promise<boolean> => {
   await delay(800);
-  return true;
+  
+  try {
+    if (file.type === 'file') {
+      const fileIndex = mockFiles.findIndex(f => f.id === file.id);
+      if (fileIndex !== -1) {
+        mockFiles[fileIndex].starred = false; // Unmark as starred to restore
+      }
+    } else {
+      const folderIndex = mockFolders.findIndex(f => f.id === file.id);
+      if (folderIndex !== -1) {
+        mockFolders[folderIndex].starred = false; // Unmark as starred to restore
+      }
+      // Also restore all files and folders within this folder
+      mockFiles.forEach(f => {
+        if (f.parentFolderId === file.id) {
+          f.starred = false;
+        }
+      });
+      mockFolders.forEach(f => {
+        if (f.parentFolderId === file.id) {
+          f.starred = false;
+        }
+      });
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Error restoring item:', error);
+    return false;
+  }
 };
 
 // Get storage statistics

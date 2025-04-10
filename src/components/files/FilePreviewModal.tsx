@@ -32,20 +32,27 @@ const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
   
   useEffect(() => {
     const getPreviewUrl = async () => {
-      if (!file.filePath) return;
+      if (!file) return;
       
       try {
         setIsLoading(true);
         
-        // Get file URL from storage
-        const { data, error } = await supabase.storage
-          .from('files')
-          .createSignedUrl(file.filePath, 60 * 5); // 5 minutes expiry
-        
-        if (error) throw error;
-        
-        if (data?.signedUrl) {
-          setPreviewUrl(data.signedUrl);
+        // For local mock service, we'll use the direct file path
+        if (file.filePath) {
+          // Handle actual Supabase storage paths
+          // Get file URL from storage
+          const { data, error } = await supabase.storage
+            .from('files')
+            .createSignedUrl(file.filePath, 60 * 5); // 5 minutes expiry
+          
+          if (error) throw error;
+          
+          if (data?.signedUrl) {
+            setPreviewUrl(data.signedUrl);
+          }
+        } else {
+          // If we're using mock service, set a mock URL based on file type
+          setPreviewUrl(`/mock-preview/${file.id}`);
         }
       } catch (error) {
         console.error('Error getting preview URL:', error);
@@ -65,7 +72,7 @@ const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
     
     return () => {
       // Cleanup preview URL when component unmounts
-      if (previewUrl) {
+      if (previewUrl && previewUrl.startsWith('blob:')) {
         URL.revokeObjectURL(previewUrl);
       }
     };
