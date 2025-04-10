@@ -23,8 +23,12 @@ const Landing: React.FC = () => {
             <HardDrive className="h-10 w-10 text-white" />
           </div>
         </div>
+<<<<<<< HEAD
   
         <h1 className="text-4xl font-bold mb-4">Welcome to SkyStack</h1>
+=======
+        <h1 className="text-4xl font-bold mb-4">Welcome to SkyStack Cloud Vault</h1>
+>>>>>>> 2a597922acfaf20e844fe2f578afe23cfcef099c
         <p className="text-xl text-muted-foreground mb-8">
           Secure cloud storage for all your files with powerful sharing capabilities
         </p>

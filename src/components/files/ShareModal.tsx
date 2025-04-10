@@ -32,7 +32,7 @@ const ShareModal: React.FC<ShareModalProps> = ({ file, onClose, onShare }) => {
   const { toast } = useToast();
   
   // Generate a fake share link for demo purposes
-  const shareLink = file ? `https://aigility.cloud/s/${file.id.substring(0, 8)}` : "";
+  const shareLink = file ? `https://skystack.cloud/s/${file.id.substring(0, 8)}` : "";
   
   const handleCopyLink = () => {
     navigator.clipboard.writeText(shareLink);
