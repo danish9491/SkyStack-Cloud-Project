@@ -171,12 +171,8 @@ const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
     <Dialog open={!!file} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-4xl">
         <DialogHeader>
-          <DialogTitle className="flex items-center justify-between">
-            <span>{file.name}</span>
-            <Button variant="ghost" size="icon" onClick={onClose}>
-              <X className="h-4 w-4" />
-            </Button>
-          </DialogTitle>
+        <DialogTitle>{file.name}</DialogTitle>
+
         </DialogHeader>
         
         <div className="min-h-[50vh]">

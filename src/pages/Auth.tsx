@@ -23,7 +23,7 @@ const Auth: React.FC = () => {
             <div className="bg-aigility-purple rounded-md p-1">
               <HardDrive className="h-6 w-6 text-white" />
             </div>
-            <h1 className="text-xl font-bold">Aigility Cloud Vault</h1>
+            <h1 className="text-xl font-bold">SkyStack</h1>
           </div>
         </div>
       </header>

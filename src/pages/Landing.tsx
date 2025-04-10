@@ -16,17 +16,19 @@ const Landing: React.FC = () => {
   }
   
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-primary/5 to-background">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-primary/5 to-background relative">
       <div className="text-center max-w-3xl px-4">
         <div className="flex justify-center mb-6">
           <div className="bg-aigility-purple rounded-md p-3">
             <HardDrive className="h-10 w-10 text-white" />
           </div>
         </div>
-        <h1 className="text-4xl font-bold mb-4">Welcome to Aigility Cloud Vault</h1>
+  
+        <h1 className="text-4xl font-bold mb-4">Welcome to SkyStack</h1>
         <p className="text-xl text-muted-foreground mb-8">
           Secure cloud storage for all your files with powerful sharing capabilities
         </p>
+  
         <div className="flex flex-wrap gap-4 justify-center">
           <Button size="lg" onClick={() => navigate("/dashboard")}>
             Go to Dashboard
@@ -36,8 +38,14 @@ const Landing: React.FC = () => {
           </Button>
         </div>
       </div>
+  
+      {/* 👇 Creator credit at the bottom */}
+      <div className="absolute bottom-6 text-center text-muted-foreground text-sm">
+        Created by <span className="font-semibold text-primary">Arnab Rai</span> & <span className="font-semibold text-primary">Mohammad Danish Ansari</span>
+      </div>
     </div>
   );
+  
 };
 
 export default Landing;
