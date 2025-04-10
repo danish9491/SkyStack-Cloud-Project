@@ -1,4 +1,3 @@
-
 // Mock data and services for the file management system
 import { v4 as uuidv4 } from 'uuid';
 import { useToast } from '@/components/ui/use-toast';
@@ -45,7 +44,7 @@ export type StorageStats = {
   totalStorage: number; // in bytes
   fileCount: number;
   folderCount: number;
-  breakdown?: Array<{ type: string; size: number; color: string }>;
+  breakdown?: Array<{ label: string; size: number; color: string }>;
 };
 
 // Mock storage for files and folders
@@ -468,10 +467,10 @@ export const getStorageStats = async (): Promise<StorageStats> => {
   
   // Add a mock breakdown for storage stats
   const breakdown = [
-    { type: 'Documents', size: 4300000, color: '#4285f4' },
-    { type: 'Images', size: 4200000, color: '#0f9d58' },
-    { type: 'Videos', size: 58000000, color: '#f4b400' },
-    { type: 'Others', size: 25000, color: '#db4437' }
+    { label: 'Documents', size: 4300000, color: '#4285f4' },
+    { label: 'Images', size: 4200000, color: '#0f9d58' },
+    { label: 'Videos', size: 58000000, color: '#f4b400' },
+    { label: 'Others', size: 25000, color: '#db4437' }
   ];
   
   return {
