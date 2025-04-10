@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 
 # Welcome to your SkyStack Cloud Vault project
 
@@ -54,3 +55,6 @@ This project is built with:
 - React
 - shadcn-ui
 - Tailwind CSS
+=======
+# SkyStack-Cloud-Project
+>>>>>>> f9a4b0dd1f86e4bbed9f4600286aee7abf714e64
